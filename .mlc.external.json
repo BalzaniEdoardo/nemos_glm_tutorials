@@ -1,0 +1,14 @@
+{
+  "ignorePatterns": [
+    { "pattern": "^\\." },
+    { "pattern": "^/" },
+    { "pattern": "^../" },
+    { "pattern": "^[^/]+$" },
+    { "comment": "RGC dataset zip, gated behind a permission request", "pattern": "^https://pillowlab\\.princeton\\.edu/data/data_RGCs\\.zip" }
+  ],
+  "aliveStatusCodes": [200, 206, 302, 400, 403, 503, 504, 0],
+  "timeout": "20s",
+  "retryOn429": true,
+  "retryCount": 5,
+  "fallbackRetryDelay": "5s"
+}

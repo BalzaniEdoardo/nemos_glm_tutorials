@@ -8,6 +8,15 @@ The original Matlab implementation and its python translation can be found at th
 - Python:  https://github.com/pillowlab/GLMspiketraintutorial_python
 
 
+<h2 style="font-size: 2em; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">Contents</h2>
+
+
+```{toctree}
+:maxdepth: 3
+
+01_poisson_glm.md
+```
+
 ## What's changed
 
 - As of NeMoS version `0.2.7`, the smoothing Laplacian prior is not shipped with the package. This prior was used in the original `tutorial3_regularization_linGauss` and `tutorial4_regularization_PoissonGLM`. Smoothing is obtained by basis expansion approximation instead. 
