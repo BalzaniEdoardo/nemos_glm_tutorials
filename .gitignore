@@ -219,3 +219,5 @@ __marimo__/
 
 # scripting dir
 _scripts/
+
+.idea/
