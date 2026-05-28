@@ -61,6 +61,18 @@ notebooks = [
     "seaborn",
     "plotly",
 ]
+docs = [
+    "sphinx",                       # Documentation generator
+    "myst-nb",                      # Parse + execute MyST-Markdown notebooks
+    "sphinx-book-theme",            # HTML theme used in conf.py
+    "sphinx-copybutton",            # "copy" button on code blocks
+    "ipykernel",                    # Kernel used by myst-nb to execute notebooks
+    # Runtime deps needed to *execute* the tutorial notebooks at build time
+    "pynapple",
+    "matplotlib>=3.7",
+    "seaborn",
+    "pandas",
+]
 
 
 [tool.black]
