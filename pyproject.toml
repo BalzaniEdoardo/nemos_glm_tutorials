@@ -1,0 +1,131 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nemos_tutorials"
+version = "0.1.0a0"
+authors = [
+    {name = "Edoardo Balzani"},
+    {name = "Guillaume Viejo"},
+]
+description = "Collections of NeMoS based tutorials."
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+keywords = ["neuroscience", "GLM", "modeling"]
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14"
+]
+
+# Define dependencies for the project
+dependencies = [
+    "nemos",
+    "pooch",
+]
+
+# Configure package discovery for setuptools
+[tool.setuptools.packages.find]
+where = ["src"]     # The directory where package modules are located
+include = ["nemos_tutorials"] # The specific package(s) to include in the distribution
+
+# Define optional dependencies for the project
+[project.optional-dependencies]
+dev = [
+    "black[jupyter]",               # Code formatter, including notebook support
+    "isort",                        # Import sorter
+    "ruff",                         # Lint docstrings for now, eventually switch to ruff for all linting
+    "pytest",                       # Testing framework
+    "pytest-xdist",                 # Parallelize pytest
+    "flake8",                       # Code linter
+    "coverage",                     # Test coverage measurement
+    "pytest-cov",                   # Test coverage plugin for pytest
+    "statsmodels",                  # Used to compare model pseudo-r2 in testing
+    "matplotlib>=3.7",              # Used by comparison examples
+    "docker",                       # Other way of running the original implementation
+    "tox-uv",                       # Run tox with uv for faster installs
+]
+notebooks = [
+    "jupyterlab",
+    "jupyterlab-code-formatter",
+    "jupytext",
+    "jupyter-collaboration",
+    "pandas",
+    "pynapple",
+    "seaborn",
+    "plotly",
+]
+
+
+[tool.black]
+target-version = ['py312', 'py313', 'py314']
+skip-string-normalization = false
+exclude = '''
+(
+  /(
+      \.eggs
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.md
+    | \.toml
+    | \.cfg
+    | \.txt
+    | \.tox
+    | \.venv
+    | \.ipynb_checkpoints
+    | _build
+    | buck-out
+    | build
+    | dist
+    ))'''
+
+# Configure isort
+[tool.isort]
+multi_line_output = 3             # Use three-line style for multi-line imports
+include_trailing_comma = true     # Include trailing comma in multi-line imports
+profile = "black"
+skip = []
+skip_glob = ["*/.ipynb_checkpoints/*"]
+
+# Configure pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]             # Specify the directory where test files are located
+pythonpath = ["."]
+filterwarnings = [
+    # note the use of single quote below to denote "raw" strings in TOML
+    # this is raised whenever one imports the plotting utils
+    'ignore:plotting functions contained within:UserWarning',
+    # numerical inversion test reaches tolerance...
+    'ignore:Tolerance of -?\d\.\d+e-\d\d reached:RuntimeWarning',
+    # mpl must be non-interctive for testing otherwise doctests will freeze
+    'ignore:FigureCanvasAgg is non-interactive, and thus cannot be shown:UserWarning',
+]
+markers = [
+  "solver_related: tests that interact with solvers",
+  "requires_x64: mark test as requiring JAX float64 precision",
+]
+# -s: no capture from pytest (prints will show)
+addopts = ["-s", "--strict-markers"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "@abc.abstractmethod",
+    "if __name__ == .__main__.:"
+]
+
+[tool.ruff.lint]
+# TODO: Re-enable NumPy docstring rules when public APIs are ready.
+# select = ["D"]
+# ignore = ["D202"]  # this conflicts with black
+select = []
+
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
