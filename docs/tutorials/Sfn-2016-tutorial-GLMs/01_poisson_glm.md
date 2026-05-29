@@ -520,9 +520,11 @@ plt.show()
 
 Let's convert our tuning curve to a function by linear interpolation using a simple jax reimplementation of `scipy.interp1d` with `kind='nearest'` and ` fill_value='extrapolate'`.
 
-:::{admonition} Why not using `interp1d` directly?
+:::{admonition} Why not use `scipy.interp1d` directly?
 
-Using `scipy.interp1d` directly would work too, but in order to use the interpolation function as an `inverse_link_function` in a NeMoS GLM, we need to a jax compatible version of it. 
+`scipy.interp1d` works fine for plotting, but it can't be used as an `inverse_link_function` in a NeMoS GLM. NeMoS validates the link function by JIT-compiling it and taking its gradient, so the function has to be written in `jax` — hence the small reimplementation above.
+
+That validation is also why the body looks slightly fussier than a plain lookup. NeMoS may call the link function on a scalar (0-D) input, so we `jnp.atleast_1d` the argument to keep the `x[:, None]` broadcasting valid, and `jnp.squeeze` the result so a 0-D input still returns a 0-D output. A bit of boilerplate, but it's the typical price of supplying a custom, traceable nonlinearity.
 :::
 
 ```{code-cell} ipython3
@@ -555,17 +557,21 @@ plt.show()
 
 Lastly, compute log-likelihood for the Poisson GLMs we've used so far and compare performance. The difference of the loglikelihood and homogeneous-Poisson loglikelihood, normalized by the number of spikes, gives us an intuitive way to compare log-likelihoods in units of bits / spike.  This is a quantity known as the (empirical) single-spike information. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000]. You can think of this as the number of bits (number of yes/no questions that we can answer) about the times of spikes when we know the spike rate output by the model, compared to when we only know the (constant) mean spike rate. 
 
+For the two fitted GLMs we get the log-likelihood from `score`, which evaluates the model's likelihood and drops the NaN-padded samples internally, so we don't have to think about them. The homogeneous (constant-rate) model is not a fitted GLM, so there is no `score` to call: we evaluate the Poisson log-likelihood directly through the observation model. That means we have to drop the invalid samples ourselves — both so `log_likelihood` only sees valid entries, and so the constant rate is the mean over genuine bins rather than being biased by the NaN-padding. That clean-up is exactly what `score` was doing for us for free; here we reproduce it by hand via `valid_counts`.
+
 ```{code-cell} ipython3
 
-# comptue the **total** model log-likelihood 
-# default aggregation would be `np.mean`, giving a likelihood per-sample
+# Total model log-likelihood (the default aggregation, np.mean, would instead
+# give a per-sample likelihood). `score` drops the NaN-padded samples for us.
 ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
 np_poisson_model.inverse_link_function = lambda x: nearest_interp(x) / neuron_counts.rate
 ll_np_pglm = np_poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
-# Now compute the rate under "homogeneous" Poisson model that assumes a
-# constant firing rate with the correct mean spike count.
+# Now the "homogeneous" Poisson model: a constant firing rate equal to the mean
+# spike count. There is no fitted GLM to score here, so we call the observation
+# model directly and drop the NaN-padded bins ourselves, so the mean rate is
+# computed only over valid samples.
 valid_counts = neuron_counts[window_size:].d
 ll0 = poisson_model.observation_model.log_likelihood(
     valid_counts, 
