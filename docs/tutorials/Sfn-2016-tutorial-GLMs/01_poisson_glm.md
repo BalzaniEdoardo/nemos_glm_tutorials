@@ -87,17 +87,44 @@ print(f"\ntimes: {stim_times[:5]}\n\nvalues: {stim[:5]}")
 stimulus = nap.Tsd(stim_times, stim)
 
 print("Number of stim frames:", len(stimulus))
-# Tsd.rate is in Hz
-print(f"Time bin size: {1/stimulus.rate :.1} ms")
+# Tsd.rate stores the sampling rate in Hz
+# Note: that this is not computed directly as the delta between consecutive bins, 
+# but as the total duration divided by the number of events.
+print(f"Time bin size: {1000./stimulus.rate :.2} ms")
 ```
 
-Finally, let's plot the 
+Finally, let's plot one second of the time series, we can use the `get` method to extract a specific time interval.
+
+```{code-cell} ipython
+import matplotlib.pyplot as plt
+
+cell_idx = 2
+plt.figure()
+
+# Note: conveniently matplotlib recognize stimulus.t (index) as the x-axis.
+plt.plot(stimulus.get(0, 1), label="stimulus")
+
+# Overaly spike raster at y=-0.6
+plt.plot(units[cell_idx].get(0, 1).fillna(-0.6), "|", color="k", label="spikes")
+
+plt.title("raw stimulus (full field flicker)")
+plt.ylim(-0.66, 0.8)
+plt.xlabel("time (s)")
+plt.legend()
+plt.show()
+
+```
 ## Pre-processing
 
-After loading the two time series in `pynapple` we would like to pre-process the activity by binning the spikes
-Additionally, and very conveniently, every time series object in `pynapple` stores a `time_support` attribute, which of [`IntervalSet`](https://pynapple.org/generated/pynapple.IntervalSet.html) set type. IntervalSets  specifies starts and ends of (irregular) continuous recoding epochs.
+To fit a Possisson GLM to our data we need to make sure that:
 
-The time support can be provided at object initialization. If not provided, the support is inferred from data, as a single epoch from the minimum to the maximum of the provided time stamps.
+1. The spike times are converted to spike counts, this is what the Poisson GLM models.
+2. The stimulus is re-sampled at the same resolution as the counts.
+3. The time axis of the counts and that of the re-sampled stimulus must temporally aligned.
+
+In particular, to be temporally aligned means that the two time series must start at the same time. In `pynapple`, the time range spanned by a time series is stored in the `time_support` attribute. The `time_support` is a `pynapple` [`IntervalSet`](https://pynapple.org/generated/pynapple.IntervalSet.html) object, which is collection of starts and ends marking continuous recoding epochs. 
+
+Since we haven't provided any time support at the time series initialization, the `time_support` is set to a single epoch spanning the whole range of the time series. Let's print and compare the support of our two time series:
 
 ```{code-cell} ipython3
 print("Stimulus\n========")
@@ -118,6 +145,31 @@ print(
 )
 ```
 
+As we can see, there is a mismatch. So before any other processing step, a convenient way to align the time series is to restrict the `units` time series to the time support of the input. That's exactly what the `restrict` method is for.
+
 ```{code-cell} ipython3
+units = units.restrict(stimulus.time_support)
+units.time_support
+```
+
+What happened is that: every spike time that occurred outside the stimulus support has been dropped, and the time support of `units` has been replaced by that of `stimulus`.
+
+After this pre-processing step, we can proceed by counting the spikes using the `count` method of `TsGroup`. The method will bin uniformily the `time_support` of the time series.
+
+```{code-cell} ipython3
+bin_size = stimulus.t[1] - stimulus.t[0]
+counts = units.count(bin_size, stimulus.time_support)
+counts
 
 ```
+
+We can note that the counts are regularly binned over the whole time support. To make sure that the stimulus matches we re-sample the stimulus by picking for every time point in `counts.t` the stimulus value closest in time. 
+
+```{code-cell} ipython3
+
+# for every sample i, get the closetst stimulus preceding counts.t[i]
+stimulus = counts.value_from(stimulus, mode="before")
+stimulus
+```
+
+And that's it, the time series are aligned, sampled at the same resolution, and ready to go for our GLM modeling!
