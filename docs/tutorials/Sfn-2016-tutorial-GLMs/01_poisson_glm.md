@@ -13,9 +13,9 @@ kernelspec:
 
 # Tutorial 1 - Poisson GLM
 
-This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb)'s matherial presented at a short course on 
+This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 
-This is a tutorial illustrating the fitting of a linear-Gaussian GLM (also known as linear least-squares regression model) and a Poisson GLM (aka  "linear-nonlinear-Poisson" model) to retinal ganglion cell (RGC) spike trains stimulated with binary temporal white noise. 
+It illustrates how to fit a linear-Gaussian GLM (also known as a linear least-squares regression model) and a Poisson GLM (also known as a "linear-nonlinear-Poisson" model) to retinal ganglion cell (RGC) spike trains driven by binary temporal white noise.
 
 (Data from [Uzzell & Chichilnisky, 2004](http://jn.physiology.org/content/92/2/780.long); see [`README.txt`](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/data_RGCs/README.txt) for details).
 
@@ -23,9 +23,9 @@ The dataset is provided for tutorial purposes only, and should not be distribute
 
 ## Downloading the dataset
 
-The `nemos_tutorials` package ships a few utility functions that simplify dowloading the dataset and loading them into `pynapple`.  `pynapple` will be the entry point for most, if not all, the tutorials, and will take care of all the common pre-processing steps, such as counting, smoothing, up/down sampling etc.
+The `nemos_tutorials` package ships a few utility functions that simplify downloading the dataset and loading it into `pynapple`. `pynapple` will be the entry point for most, if not all, of these tutorials, taking care of common pre-processing steps such as counting, smoothing, and up/down-sampling.
 
-Let's use the `fetch_data` utility to download the files and retrieve the download paths.
+Let's use the `fetch_data` utility to download the files and retrieve their local paths.
 
 ```{code-cell} ipython3
 from nemos_tutorials import fetch_data
@@ -36,12 +36,12 @@ data_paths
 
 ## Loading data into pynapple
 
-In this first tutorial, we will demonstrate how to load the RGC data into [`pynapple`](https://pynapple.org) directly from the original Matlab files via `scipy.io.loadmat`. Subsequently, we will use directly an utility function for brevity.
+In this first tutorial, we will load the RGC data into [`pynapple`](https://pynapple.org) directly from the original Matlab files via `scipy.io.loadmat`, so that every step is explicit. In later tutorials we will rely on a utility function instead, for brevity.
 
 
-### Spike Times as TsGroup
+### Spike times as a TsGroup
 
-Let's start by loading the spike times. This will be loaded as a list of 4 arrays, each containing the spike trains of a recorded unit.
+Let's start with the spike times. These load as a list of 4 arrays, one spike train per recorded unit.
 
 ```{code-cell} ipython3
 from scipy.io import loadmat
@@ -56,7 +56,7 @@ print("Spike times of unit 0:")
 print(spike_times[0])
 ```
 
-A list of spike times can be loaded directly into a `pynapple` [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html), a dictionary object conaining multiple timestamps arrays, and associated metadata if present.
+A list of spike times can be loaded directly into a `pynapple` [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html), a dictionary-like object that holds multiple timestamp arrays together with their associated metadata, if any.
 
 ```{code-cell} ipython3
 import pynapple as nap
@@ -66,12 +66,12 @@ units = nap.TsGroup({i: nap.Ts(val) for i, val in enumerate(spike_times)})
 units
 ```
 
-The [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html) is represented as a table, the first column is the unit index. If not provided 0, ..., num units - 1 will be used. The second column is the mean firing rate of the units in Hz, computed directly from the spike trains.  When present, additional columns include the associated metadata.
+The [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html) is displayed as a table. The first column is the unit index; if not provided, `pynapple` assigns `0, ..., num_units - 1`. The second column is each unit's mean firing rate in Hz, computed directly from its spike train. Any additional columns hold the associated metadata.
 
 
 ### Stimulus as a Tsd
 
-For this dataset, the stimulus is a full-field binary white noise. Stimulus presentaiton time and stimulus values are stored in separate 1-D arrays.
+For this dataset, the stimulus is a full-field binary white noise. The stimulus presentation times and the stimulus values are stored in two separate 1-D arrays.
 
 ```{code-cell} ipython3
 # Load stimulus times and values
@@ -81,7 +81,7 @@ stim = loadmat(data_paths["Stim.mat"], simplify_cells=True)["Stim"]
 print(f"\ntimes: {stim_times[:5]}\n\nvalues: {stim[:5]}")
 ```
 
-`pynapple` stores 1-D time series with data as `Tsd` objects. These objects have a time attribute `t` containing the time stamps, and a data attribute `d` containing the data.
+`pynapple` stores 1-D time series as `Tsd` objects. Each `Tsd` has a time attribute `t` holding the timestamps and a data attribute `d` holding the corresponding values.
 
 ```{code-cell} ipython3
 stimulus = nap.Tsd(stim_times, stim)
@@ -93,7 +93,7 @@ print("Number of stim frames:", len(stimulus))
 print(f"Time bin size: {1000./stimulus.rate :.2} ms")
 ```
 
-Finally, let's plot one second of the time series, we can use the `get` method to extract a specific time interval.
+Finally, let's plot one second of the time series. We can use the `get` method to extract a specific time interval.
 
 ```{code-cell} ipython
 import matplotlib.pyplot as plt
@@ -101,10 +101,10 @@ import matplotlib.pyplot as plt
 cell_idx = 2
 plt.figure()
 
-# Note: conveniently matplotlib recognize stimulus.t (index) as the x-axis.
+# Note: matplotlib conveniently uses stimulus.t (the index) as the x-axis.
 plt.plot(stimulus.get(0, 1), label="stimulus")
 
-# Overaly spike raster at y=-0.6
+# Overlay the spike raster at y=-0.6
 plt.plot(units[cell_idx].get(0, 1).fillna(-0.6), "|", color="k", label="spikes")
 
 plt.title("raw stimulus (full field flicker)")
@@ -116,15 +116,15 @@ plt.show()
 ```
 ## Pre-processing
 
-To fit a Possisson GLM to our data we need to make sure that:
+A Poisson GLM predicts a spike count at each time bin from the stimulus in that bin (and, later, from the recent stimulus and spike history). For the model inputs and outputs to line up, we need three things:
 
-1. The spike times are converted to spike counts, this is what the Poisson GLM models.
-2. The stimulus is re-sampled at the same resolution as the counts.
-3. The time axis of the counts and that of the re-sampled stimulus must temporally aligned.
+1. **Spike counts.** The spike times must be converted to spike counts, since counts are what the Poisson GLM models.
+2. **Matched sampling.** The stimulus must be re-sampled onto the same time bins as the counts, so that each count has exactly one stimulus value associated with it.
+3. **Temporal alignment.** The time axes of the counts and the re-sampled stimulus must cover the same interval, so that bin `i` of one corresponds to bin `i` of the other.
 
-In particular, to be temporally aligned means that the two time series must start at the same time. In `pynapple`, the time range spanned by a time series is stored in the `time_support` attribute. The `time_support` is a `pynapple` [`IntervalSet`](https://pynapple.org/generated/pynapple.IntervalSet.html) object, which is collection of starts and ends marking continuous recoding epochs. 
+Let's start with alignment. Two time series are temporally aligned when they span the same interval. In `pynapple`, the interval covered by a time series is stored in its `time_support` attribute, a [`IntervalSet`](https://pynapple.org/generated/pynapple.IntervalSet.html) object: a collection of start/end pairs marking continuous recording epochs.
 
-Since we haven't provided any time support at the time series initialization, the `time_support` is set to a single epoch spanning the whole range of the time series. Let's print and compare the support of our two time series:
+Since we did not pass a time support when constructing the time series, `pynapple` set each one to a single epoch spanning its full range. Let's print and compare the supports of our two time series:
 
 ```{code-cell} ipython3
 print("Stimulus\n========")
@@ -145,16 +145,16 @@ print(
 )
 ```
 
-As we can see, there is a mismatch. So before any other processing step, a convenient way to align the time series is to restrict the `units` time series to the time support of the input. That's exactly what the `restrict` method is for.
+As we can see, the supports do not match: the spikes extend beyond the window in which the stimulus was actually presented. Before doing anything else, we align the two by restricting the `units` time series to the stimulus support. That is exactly what the `restrict` method is for.
 
 ```{code-cell} ipython3
 units = units.restrict(stimulus.time_support)
 units.time_support
 ```
 
-What happened is that: every spike time that occurred outside the stimulus support has been dropped, and the time support of `units` has been replaced by that of `stimulus`.
+Two things happened here: every spike that fell outside the stimulus support was dropped, and the time support of `units` was replaced by that of `stimulus`. The two series now span the same interval.
 
-After this pre-processing step, we can proceed by counting the spikes using the `count` method of `TsGroup`. The method will bin uniformily the `time_support` of the time series.
+With the supports aligned, we can convert the spike times to counts using the `count` method of `TsGroup`. Given a bin size, `count` tiles the `time_support` with uniform bins and counts the spikes falling in each one. We choose a bin size equal to the stimulus frame interval, so that the counts will share the stimulus's native resolution.
 
 ```{code-cell} ipython3
 bin_size = stimulus.t[1] - stimulus.t[0]
@@ -163,13 +163,12 @@ counts
 
 ```
 
-We can note that the counts are regularly binned over the whole time support. To make sure that the stimulus matches we re-sample the stimulus by picking for every time point in `counts.t` the stimulus value closest in time. 
+The counts are now regularly binned over the whole time support. The last step is to put the stimulus on these exact bins. We do this with `value_from`, which, for every timestamp in `counts.t`, looks up a value from the stimulus. Using `mode="before"` picks the most recent stimulus sample at or before each count bin, which is the causally correct choice: the count in a bin can only be driven by stimulus that has already been presented, never by a future frame.
 
 ```{code-cell} ipython3
-
-# for every sample i, get the closetst stimulus preceding counts.t[i]
+# for every sample i, take the most recent stimulus value at or before counts.t[i]
 stimulus = counts.value_from(stimulus, mode="before")
 stimulus
 ```
 
-And that's it, the time series are aligned, sampled at the same resolution, and ready to go for our GLM modeling!
+And that's it: `counts` and `stimulus` are now aligned to the same interval, sampled on the same bins, and ready for GLM modeling.
