@@ -452,13 +452,13 @@ A way to estimate the non-linearity from the data is computing the filtered stim
 from copy import deepcopy
 
 # first let's copy our poisson GLM, to keep the original unchanged
-cp_poisson_model = deepcopy(poisson_model)
+np_poisson_model = deepcopy(poisson_model)
 
 # replace the exp non-linearity with the identity
-cp_poisson_model.inverse_link_function = lambda x: x
+np_poisson_model.inverse_link_function = lambda x: x
 
 # this compute identity(X @ model.coef_ + model.intercept_)
-raw_filter_output = cp_poisson_model.predict(X)
+raw_filter_output = np_poisson_model.predict(X)
 
 # compute the tuning curve (the output is an xarray, the)
 tc = nap.compute_tuning_curves(units[cell_idx], raw_filter_output.dropna(), bins=25, feature_names=["linpred"])
@@ -468,18 +468,31 @@ plt.show()
 
 ```
 
-Let's convert our tuning curve to a function by linear interpolation using `scipy.interp1d`.
+Let's convert our tuning curve to a function by linear interpolation using a simple jax reimplementation of `scipy.interp1d` with `kind='nearest'` and ` fill_value='extrapolate'`.
+
+:::{admonition} Why not using `interp1d` directly?
+
+Using `scipy.interp1d` directly would work too, but in order to use the interpolation function as an `inverse_link_function` in a NeMoS GLM, we need to a jax compatible version of it. 
+:::
 
 ```{code-cell} ipython3
-from scipy.interpolate import interp1d
+import jax.numpy as jnp
 
-fnlin = interp1d(tc.linpred.values, tc.values[0], kind='nearest', bounds_error=False, fill_value='extrapolate')
+# create an interpolation func
+xp = jnp.array(tc.linpred.values)
+fp = jnp.array(tc.values[0])
+def nearest_interp(x):
+    """Nearest-neighbor interpolation, extrapolates by repeating boundary values."""
+    x = jnp.atleast_1d(x) # make sure that [:, None] works even for 0-D arrays
+    idx = jnp.argmin(jnp.abs(x[:, None] - xp[None, :]), axis=1)
+    return jnp.squeeze(fp[idx]) # make sure that 0-D array returns 0-D
+
 
 # Plot exponential and nonparametric nonlinearity estimate
 fig, ax = plt.subplots(1, figsize=(10,4)) 
 x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
 ax.plot(x, np.exp(x) * neuron_counts.rate, label='exponential f', c='b')
-ax.plot(x, fnlin(x), label='nonparametric f', c='orange')
+ax.plot(x, nearest_interp(x), label='nonparametric f', c='orange')
 ax.set_xlabel('filter output')
 ax.set_ylabel('rate (sp/s)')
 ax.legend(loc='upper left')
@@ -494,6 +507,9 @@ plt.show()
 # default aggregation would be `np.mean`, giving a likelihood per-sample
 ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
+np_poisson_model.inverse_link_function = nearest_interp
+ll_np_pglm = np_poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
+
 # Now compute the rate under "homogeneous" Poisson model that assumes a
 # constant firing rate with the correct mean spike count.
 valid_counts = neuron_counts[window_size:].d
@@ -503,7 +519,8 @@ ll0 = model.observation_model.log_likelihood(
     aggregate_sample_scores=np.sum
 )
 
-LL_expGLM = np.nansum(neuron_counts * np.log(rate_pred_pGLM)) - np.nansum(rate_pred_pGLM)
+(ll_exp_pglm - ll0)/valid_counts.sum()/np.log(2)
+
 
 
 ```
