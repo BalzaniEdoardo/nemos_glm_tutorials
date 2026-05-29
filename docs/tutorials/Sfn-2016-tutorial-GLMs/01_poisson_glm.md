@@ -89,6 +89,10 @@ stimulus = nap.Tsd(stim_times, stim)
 print(f"\ntimes: {stimulus.t[:5]}\n\nvalues: {stimulus.d[:5]}")
 ```
 
+Finally, let's plot the 
+## Pre-processing
+
+After loading the two time series in `pynapple` we would like to pre-process the activity by binning the spikes
 Additionally, and very conveniently, every time series object in `pynapple` stores a `time_support` attribute, which of [`IntervalSet`](https://pynapple.org/generated/pynapple.IntervalSet.html) set type. IntervalSets  specifies starts and ends of (irregular) continuous recoding epochs.
 
 The time support can be provided at object initialization. If not provided, the support is inferred from data, as a single epoch from the minimum to the maximum of the provided time stamps.
