@@ -246,18 +246,264 @@ Even when your stimulus is not white noise, it is often worth visualizing the ST
 ```{code-cell} ipython3
 import numpy as np
 
-neuron_count = counts[:, cell_idx]
+neuron_counts = counts[:, cell_idx]
 
-# skip nans
-sta = (X.d[window_size:].T @ neuron_count[window_size:]) / neuron_count.sum()
+# Skip the nans. Note that transposition in pynapple doesn't work, so we grabbed
+# the data attribute `d` (which is a numpy array).
+sta = (X.d[window_size:].T @ neuron_counts[window_size:]) / neuron_counts.sum()
 
-ttk = np.arange(-window_size+1,1) / neuron_count.rate  # time bins for STA (in seconds)
+ttk = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
 
-plt.figure(figsize=[12,8])
+plt.figure()
 plt.plot(ttk,ttk*0, 'k--')
 plt.plot(ttk, sta, 'bo-')
 plt.title('STA')
 plt.xlabel('time before spike (s)')
 plt.xlim([ttk[0],ttk[-1]])
 plt.show()
+```
+
+:::{admonition} Why is our STA shifted by one bin from the original tutorial?
+:class: note dropdown
+
+If you put this STA side by side with the one in [Pillow's original notebook](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb), you'll notice ours is shifted by one bin: the peak sits one sample closer to zero lag. The two are otherwise identical, and reconciling them is instructive — the shift is a small, concrete example of a general issue: *how you align the spike counts to the stimulus in time directly shapes what you read off the result.*
+
+The shift happens because the two pipelines anchor the spike histogram differently. In this dataset the stimulus frames are timestamped at `dt, 2·dt, 3·dt, …` (`stim_times[0] == dt`). The original notebook bins spikes on a grid anchored at zero (`np.arange(num_time_bins+1) * dt`), so its bins are offset by one frame from where the stimulus actually starts. Here we let `count` anchor the bins at the stimulus support (which starts at `stim.t[0] == dt`) and use `value_from(..., mode="before")` to pick the most recent frame at or before each bin, so the counts and the stimulus stay genuinely aligned in time.
+
+At this bin size (~8 ms) the one-sample difference is negligible and doesn't change the shape of the filter or any conclusion we draw from it. But the size of the error is one bin *whatever the bin size is*: with coarser bins, the same misalignment would move the estimated STA peak by that much more, and could meaningfully distort the timing you report. This is exactly why `pynapple` is so handy — it tracks the real timestamps and gives you fine control over binning and resampling, so alignment is something you set deliberately rather than get by accident.
+:::
+
+## Whitened STA
+
+If the stimuli are non-white, then the STA is generally a biased estimator for the linear filter. In this case we may wish to compute the "whitened" STA, which is also the maximum-likelihood estimator for the filter of a GLM with "identity" nonlinearity and Gaussian noise (also known as least-squares regression or linear regression).
+
+If the stimuli have correlations this ML estimate may look like garbage (more on this later when we come to "regularization").  But for this dataset the stimuli are white, so we don't (in general) expect a big difference from the STA (this is because `X.T @ X` is  close to a scaled version of the identity).
+
+```{code-cell} ipython3
+
+# Whitened STA (or linear regression via the analytical formula)
+wsta = np.linalg.pinv(X.d[window_size:].T @ X[window_size:]) @ sta * neuron_counts.sum()
+
+plt.figure()
+plt.plot(ttk,ttk*0, 'k--')
+plt.plot(ttk, sta/np.linalg.norm(sta), 'bo-', label="STA")
+plt.plot(ttk, wsta/np.linalg.norm(wsta), 'ro-', label="wSTA")
+plt.title('STA and whitened STA')
+plt.xlabel('time before spike (s)')
+plt.xlim([ttk[0],ttk[-1]])
+plt.legend()
+plt.show()
+```
+
+## Rate prediction with a linear-Gaussian GLM
+
+The whitened STA can actually be used to predict spikes because it corresponds to a proper estimate of the model parameters (i.e., for a Gaussian GLM). Let's inspect this prediction.
+
+
+```{code-cell} ipython3
+
+# Predicted spikes from linear-Gaussian GLM
+sppred_lgGLM = X @ wsta  
+
+# Drop initial nans
+sppred_lgGLM = sppred_lgGLM
+
+# get the first 1sec of non-nans
+first_valid_time = sppred_lgGLM.dropna().t[0]
+ep_1sec = first_valid_time, first_valid_time + 1
+
+plt.figure()
+markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
+plt.setp(markerline, 'markerfacecolor', 'none')
+plt.setp(markerline, 'markeredgecolor', 'blue')
+plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
+plt.title('linear-Gaussian GLM: spike count prediction')
+plt.ylabel('spike count'); plt.xlabel('time (s)')
+plt.ylim(-1.2, 4)
+plt.legend()
+plt.show()
+```
+
+We can clearly see that we forgot to include an offset or "intercept" term to our design matrix, which will allow our prediction to have a non-zero mean (since the stimulus here was normalized to have zero mean).
+
+
+```{code-cell} ipython3
+
+# Add an offset (constant column in the design)
+X_offset = np.hstack([np.ones_like(neuron_counts)[:, None], X])
+
+# Compute the linear-Gaussian ML estimator
+XTX_inv = np.linalg.pinv(X_offset.d[window_size:].T @ X_offset[window_size:])
+wsta_offset =  XTX_inv @ (X_offset.d[window_size:].T @ neuron_counts[window_size:]) 
+
+# splitin intercept and coefficients
+intercept = wsta_offset[0]
+wsta_offset = wsta_offset[1:] # the linear filter part
+
+# Compute prediction with offset
+sppred_lgGLM_offset = intercept +  X @ wsta_offset
+
+plt.figure()
+markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
+plt.setp(markerline, 'markerfacecolor', 'none')
+plt.setp(markerline, 'markeredgecolor', 'blue')
+plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
+plt.plot(sppred_lgGLM_offset.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
+plt.title('linear-Gaussian GLM: spike count prediction')
+plt.ylabel('spike count'); plt.xlabel('time (s)')
+plt.ylim(-1.2, 4)
+plt.legend()
+plt.show()
+
+# Let's report the relevant training error (squared prediction error on 
+# training data) so far just to see how we're doing:
+mse1 = np.nanmean((neuron_counts.d - sppred_lgGLM)**2)   # mean squared error, GLM no offset
+mse2 = np.nanmean((neuron_counts.d - sppred_lgGLM_offset)**2)  # mean squared error, with offset
+rss = np.nanmean((neuron_counts.d - np.mean(neuron_counts))**2)    # squared error of spike train
+print('Training perf (R^2): lin-gauss GLM, no offset: {:.2f}'.format(1-mse1/rss))
+print('Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}'.format(1-mse2/rss))
+```
+
+## Linear-Gaussian GLM with NeMoS
+
+Fitting a Linear Gaussian GLM with nemos is straightforward, let's see how.
+
+```{code-cell} ipython3
+
+# Define a model object
+model = nmo.glm.GLM(observation_model="Gaussian", solver_name="BFGS")
+model.fit(X, neuron_counts)
+model
+```
+
+[//]: # (TODO: drop the solver_name parameter once the Newton PR is done)
+As we can see, all we had to set is the observation model to `Gaussian`, default would be `Poisson`. Since the inverse link function is the identity by default, the model we just fit is a linear regression.
+
+Let's plot the predictions and compare the resulting coefficients with the one obtained via the analytical formula.
+
+```{code-cell} ipython3
+
+sppred_lgGLM_nemos = model.predict(X)
+
+plt.figure()
+markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
+plt.setp(markerline, 'markerfacecolor', 'none')
+plt.setp(markerline, 'markeredgecolor', 'blue')
+plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
+plt.plot(sppred_lgGLM_offset.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
+plt.plot(sppred_lgGLM_nemos.get(*ep_1sec), "--k", label="lgGLM nemos")
+plt.title('linear-Gaussian GLM: spike count prediction')
+plt.ylabel('spike count'); plt.xlabel('time (s)')
+plt.ylim(-1.2, 4)
+plt.legend()
+plt.show()
+
+mse_nemos = np.nanmean((neuron_counts.d - sppred_lgGLM_nemos)**2)
+print('Training perf (R^2): lin-gauss GLM, nemos: {:.2f}'.format(1-mse_nemos/rss))
+```
+
+## Poisson GLM
+
+Fitting a poisson GLM with exponential non-linearity is actually as easy as a linear regression, let's do it.
+
+```{code-cell} ipython3
+# Instantiate a Poisson GLM (or change the observation model, `
+# model.observation_model = "Poisson"`)
+poisson_model = nmo.glm.GLM(solver_name="BFGS").fit(X, neuron_counts)
+poisson_model
+```
+
+And computing the predicted rate is more of the same.
+
+```{code-cell} ipython3
+rate_pred_pGLM = poisson_model.predict(X)
+
+
+fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
+
+ax1.plot(ttk, model.coef_/np.linalg.norm(model.coef_), 'o-', label='lin-gauss GLM filt', c='gold')
+ax1.plot(ttk, poisson_model.coef_/np.linalg.norm(poisson_model.coef_), 'o-', label='poisson GLM filt', c='red')
+ax1.legend(loc = 'upper left')
+ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
+ax1.set_xlabel('time before spike (s)')
+ax1.set_xlim([ttk[0], ttk[-1]])
+
+markerline,stemlines,baseline = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
+plt.setp(markerline, 'markerfacecolor', 'none')
+plt.setp(stemlines, color='b', linewidth=.5)
+plt.setp(baseline, color='b', linewidth=.5)
+ax2.plot(sppred_lgGLM_nemos.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
+ax2.plot(rate_pred_pGLM.get(*ep_1sec), label="exp-poisson GLM", c='red') 
+ax2.set_title('spike count / rate predictions')
+ax2.set_ylabel('spike count / bin'); plt.xlabel('time (s)')
+ax2.legend(loc='upper right')
+plt.tight_layout()
+plt.show()
+```
+
+
+
+## Non-parametric estimate of the nonlinearity
+
+A way to estimate the non-linearity from the data is computing the filtered stimulus (the rate before the non-linearity is applied), bin it over the range, and compute the mean firing rate per each bin. What I just described is just a tuning curve, and `pynapple` has built-in functions for this.
+
+
+```{code-cell} ipython3
+from copy import deepcopy
+
+# first let's copy our poisson GLM, to keep the original unchanged
+cp_poisson_model = deepcopy(poisson_model)
+
+# replace the exp non-linearity with the identity
+cp_poisson_model.inverse_link_function = lambda x: x
+
+# this compute identity(X @ model.coef_ + model.intercept_)
+raw_filter_output = cp_poisson_model.predict(X)
+
+# compute the tuning curve (the output is an xarray, the)
+tc = nap.compute_tuning_curves(units[cell_idx], raw_filter_output.dropna(), bins=25, feature_names=["linpred"])
+
+tc.plot()
+plt.show()
+
+```
+
+Let's convert our tuning curve to a function by linear interpolation using `scipy.interp1d`.
+
+```{code-cell} ipython3
+from scipy.interpolate import interp1d
+
+fnlin = interp1d(tc.linpred.values, tc.values[0], kind='nearest', bounds_error=False, fill_value='extrapolate')
+
+# Plot exponential and nonparametric nonlinearity estimate
+fig, ax = plt.subplots(1, figsize=(10,4)) 
+x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
+ax.plot(x, np.exp(x) * neuron_counts.rate, label='exponential f', c='b')
+ax.plot(x, fnlin(x), label='nonparametric f', c='orange')
+ax.set_xlabel('filter output')
+ax.set_ylabel('rate (sp/s)')
+ax.legend(loc='upper left')
+ax.set_title('nonlinearity')
+plt.tight_layout()
+plt.show()
+```
+
+```{code-cell} ipython3
+
+# comptue the **total** model log-likelihood 
+# default aggregation would be `np.mean`, giving a likelihood per-sample
+ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
+
+# Now compute the rate under "homogeneous" Poisson model that assumes a
+# constant firing rate with the correct mean spike count.
+valid_counts = neuron_counts[window_size:].d
+ll0 = model.observation_model.log_likelihood(
+    valid_counts, 
+    np.mean(valid_counts) * np.ones_like(valid_counts),
+    aggregate_sample_scores=np.sum
+)
+
+LL_expGLM = np.nansum(neuron_counts * np.log(rate_pred_pGLM)) - np.nansum(rate_pred_pGLM)
+
+
 ```
