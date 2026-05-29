@@ -66,7 +66,7 @@ units = nap.TsGroup({i: nap.Ts(val) for i, val in enumerate(spike_times)})
 units
 ```
 
-The [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html) is represented as a table, the first column is the unit index. If not provided 0, ..., num units - 1 will be used. The second column is the mean firing rate of the unit in Hz, computed directly from the spike trains.  When present, additional columns include the associated metadata.
+The [TsGroup](https://pynapple.org/generated/pynapple.TsGroup.html) is represented as a table, the first column is the unit index. If not provided 0, ..., num units - 1 will be used. The second column is the mean firing rate of the units in Hz, computed directly from the spike trains.  When present, additional columns include the associated metadata.
 
 
 ### Stimulus as a Tsd
@@ -86,7 +86,9 @@ print(f"\ntimes: {stim_times[:5]}\n\nvalues: {stim[:5]}")
 ```{code-cell} ipython3
 stimulus = nap.Tsd(stim_times, stim)
 
-print(f"\ntimes: {stimulus.t[:5]}\n\nvalues: {stimulus.d[:5]}")
+print("Number of stim frames:", len(stimulus))
+# Tsd.rate is in Hz
+print(f"Time bin size: {1/stimulus.rate :.1} ms")
 ```
 
 Finally, let's plot the 
