@@ -28,7 +28,11 @@ The `nemos_tutorials` package ships a few utility functions that simplify downlo
 Let's use the `fetch_data` utility to download the files and retrieve their local paths.
 
 ```{code-cell} ipython3
+import jax
 from nemos_tutorials import fetch_data
+
+# enable float64 for precision
+jax.config.update("jax_enable_x64", True)
 
 data_paths = fetch_data("data_RGCs")
 data_paths
@@ -160,10 +164,21 @@ With the supports aligned, we can convert the spike times to counts using the `c
 bin_size = stimulus.t[1] - stimulus.t[0]
 counts = units.count(bin_size, stimulus.time_support)
 counts
-
 ```
 
-The counts are now regularly binned over the whole time support. The last step is to put the stimulus on these exact bins. We do this with `value_from`, which, for every timestamp in `counts.t`, looks up a value from the stimulus. Using `mode="before"` picks the most recent stimulus sample at or before each count bin, which is the causally correct choice: the count in a bin can only be driven by stimulus that has already been presented, never by a future frame.
+The counts are now regularly binned over the whole time support. Let's plot the counts overlaid with the spike times.
+
+```{code-cell} ipython3
+plt.figure()
+plt.plot(counts[:, cell_idx].get(0, 1), label="spike counts")
+plt.plot(units[cell_idx].get(0, 1).fillna(-0.2), "|", color="k", label="spikes")
+plt.title('binned spike counts')
+plt.ylabel('spike count')
+plt.xlabel('time (s)')
+plt.legend()
+plt.show()
+```
+The last step is to put the stimulus on these exact bins. We do this with `value_from`, which, for every timestamp in `counts.t`, looks up a value from the stimulus. Using `mode="before"` picks the most recent stimulus sample at or before each count bin, which is the causally correct choice: the count in a bin can only be driven by stimulus that has already been presented, never by a future frame.
 
 ```{code-cell} ipython3
 # for every sample i, take the most recent stimulus value at or before counts.t[i]
@@ -172,3 +187,75 @@ stimulus
 ```
 
 And that's it: `counts` and `stimulus` are now aligned to the same interval, sampled on the same bins, and ready for GLM modeling.
+
+## Building the Design Matrix
+
+Now it's time to create design matrix of our model. What we want as a predictor is the stimulus history over a fixed size window $w$. What we want is to predict is the spike counts at time $t$, $y_t$ from the stimulus at times $s_{t-1},\dots, s_{t-w}$. 
+
+The resulting design matrix will look like this,
+
+$$
+X = \begin{bmatrix}
+s_{0} & s_1 & \dots & s_{w} \\
+s_{1} & s_2 & \dots & s_{w+1} \\
+\dots & \dots & \dots & \dots \\
+s_{T-w} & s_2 & \dots & s_{T} \\
+\end{bmatrix} \label{eq:design-matrix}
+$$
+
+Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`. This happens because we need at least $w$ stimulus values to build a row of design matrix. 2) each row is a shifted copy of the row above. 
+
+A convenient way to construct this design matrix is by convolving the stimulus with an identity matrix and reverse the column order. In `NeMoS`, the convolution with the identity can be applied via the `HistoryConv` basis. 
+
+
+```{code-cell} ipython3
+import nemos as nmo
+
+# Match the original notebook
+window_size = 25
+
+# define the basis object
+bas = nmo.basis.HistoryConv(25, conv_kwargs={"shift": False})
+
+# Convolve with the identity
+X = bas.compute_features(stimulus)
+# Reverse column order (to match original notebook)
+X = X[:,::-1]
+```
+
+As you can see:
+
+1. The design matrix is a `pynapple` object, i.e. the information about the time series is preserved, including teh time axis and the time support.
+2. The number of samples in `X` matches that of the `stimulus`. This happens because `NeMoS` NaN pads a convolution in mode valid, which outputs $T - w$ samples. This is convenient because `X` and `counts` remains aligned.
+
+Note that reversing or not the column order results in equivalent designs, however changes how the columns are interpreted: if follow $~\eqref{eq:design-matrix}$, then the first column holds the stimulus values $w$ samples in the past, and the last column holds the stimulus at the current sample.
+
+```{code-cell} ipython3
+
+plt.pcolormesh(X[window_size:window_size+50], cmap="Pastel1")
+plt.show()
+```
+
+## Compute and visualize the spike-triggered average (STA)
+
+When the stimulus is Gaussian white noise, the STA provides an unbiased estimator for the filter in a GLM / LNP model (as long as the nonlinearity results in an STA whose expectation is not zero; feel free to ignore this parenthetical remark if you're not interested in technical details. It just means that if the nonlinearity is symmetric, eg. x^2, then this condition won't hold, and the STA won't be useful).
+
+In many cases it's useful to visualize the STA (even if your stimuli are not white noise), just because if we don't see any kind of structure then this may indicate that we have a problem (e.g., a mismatch between the design matrix and binned spike counts.
+
+
+```{code-cell} ipython3
+neuron_count = counts[:, cell_idx]
+
+# skip nans
+sta = (X.d[window_size:].T @ neuron_count[window_size:]) / neuron_count.sum()
+
+ttk = np.arange(-window_size+1,1) / neuron_count.rate  # time bins for STA (in seconds)
+plt.clf()
+plt.figure(figsize=[12,8])
+plt.plot(ttk,ttk*0, 'k--')
+plt.plot(ttk, sta, 'bo-')
+plt.title('STA')
+plt.xlabel('time before spike (s)')
+plt.xlim([ttk[0],ttk[-1]])
+plt.show()
+```
