@@ -499,18 +499,12 @@ A way to estimate the non-linearity from the data is computing the filtered stim
 
 
 ```{code-cell} ipython3
-from copy import deepcopy
 
-# first let's copy our poisson GLM, to keep the original unchanged
-np_poisson_model = deepcopy(poisson_model)
+# The filtered stimulus is the GLM's linear predictor: its output *before* the
+# nonlinearity, i.e. X @ coef + intercept.
+raw_filter_output = X @ poisson_model.coef_ + poisson_model.intercept_
 
-# replace the exp non-linearity with the identity
-np_poisson_model.inverse_link_function = lambda x: x
-
-# this compute identity(X @ model.coef_ + model.intercept_)
-raw_filter_output = np_poisson_model.predict(X)
-
-# compute the tuning curve (the output is an xarray, the)
+# Binning that against the spikes and averaging per bin is exactly a tuning curve.
 tc = nap.compute_tuning_curves(units[cell_idx], raw_filter_output.dropna(), bins=25, feature_names=["linpred"])
 
 tc.plot()
@@ -518,7 +512,7 @@ plt.show()
 
 ```
 
-Let's convert our tuning curve to a function by linear interpolation using a simple jax reimplementation of `scipy.interp1d` with `kind='nearest'` and ` fill_value='extrapolate'`.
+Let's convert our tuning curve to a function by nearest-neighbor interpolation, using a simple jax reimplementation of `scipy.interp1d` with `kind='nearest'` and `fill_value='extrapolate'`. We then plug it straight into a GLM as the inverse link function, reusing the exp-GLM's fitted filter rather than refitting.
 
 :::{admonition} Why not use `scipy.interp1d` directly?
 
@@ -530,7 +524,10 @@ That validation is also why the body looks slightly fussier than a plain lookup.
 ```{code-cell} ipython3
 import jax.numpy as jnp
 
-# create an interpolation func
+# bins per second: converts between spikes/bin (the GLM's units) and spikes/s.
+rate_hz = neuron_counts.rate
+
+# Build a jax interpolator from the tuning curve.
 xp = jnp.array(tc.linpred.values)
 fp = jnp.array(tc.values[0])
 def nearest_interp(x):
@@ -539,11 +536,18 @@ def nearest_interp(x):
     idx = jnp.argmin(jnp.abs(x[:, None] - xp[None, :]), axis=1)
     return jnp.squeeze(fp[idx]) # make sure that 0-D array returns 0-D
 
+# A Poisson GLM whose nonlinearity *is* the estimated tuning curve. The curve is
+# in spikes/s, so we divide by rate_hz to get the GLM's spikes/bin. We set the
+# link at construction and reuse the exp-GLM's fitted filter instead of refitting.
+np_poisson_model = nmo.glm.GLM(inverse_link_function=lambda x: nearest_interp(x) / rate_hz)
+np_poisson_model.coef_ = poisson_model.coef_
+np_poisson_model.intercept_ = poisson_model.intercept_
+np_poisson_model.scale_ = poisson_model.scale_
 
 # Plot exponential and nonparametric nonlinearity estimate
 fig, ax = plt.subplots(1, figsize=(10,4)) 
 x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
-ax.plot(x, np.exp(x) * neuron_counts.rate, label='exponential f', c='b')
+ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c='b')
 ax.plot(x, nearest_interp(x), label='nonparametric f', c='orange')
 ax.set_xlabel('filter output')
 ax.set_ylabel('rate (sp/s)')
@@ -564,8 +568,6 @@ For the two fitted GLMs we get the log-likelihood from `score`, which evaluates 
 # Total model log-likelihood (the default aggregation, np.mean, would instead
 # give a per-sample likelihood). `score` drops the NaN-padded samples for us.
 ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
-
-np_poisson_model.inverse_link_function = lambda x: nearest_interp(x) / neuron_counts.rate
 ll_np_pglm = np_poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
 # Now the "homogeneous" Poisson model: a constant firing rate equal to the mean
