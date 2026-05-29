@@ -38,6 +38,59 @@ data_paths = fetch_data("data_RGCs")
 data_paths
 ```
 
+```{code-cell} ipython3
+:tags: [hide-input]
+
+import matplotlib.pyplot as plt
+
+
+def plot_counts_with_predictions(
+    counts, ep, predictions, title="", ylabel="spike count", ylim=None, ax=None
+):
+    """Stem-plot binned spike counts over `ep` and overlay one or more model predictions.
+
+    Parameters
+    ----------
+    counts:
+        Tsd of binned spike counts.
+    ep:
+        ``(start, end)`` interval in seconds, forwarded to ``.get``.
+    predictions:
+        List of ``(tsd, label, color)`` or ``(tsd, label, color, linestyle)`` tuples.
+    title, ylabel, ylim:
+        Standard axis cosmetics.
+    ax:
+        Axes to draw on. A new figure is created when ``None``.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 4))
+
+    c = counts.get(*ep)
+    markerline, stemlines, baseline = ax.stem(
+        c.t, c.d, linefmt="b-", basefmt="k-", label="spike ct"
+    )
+    plt.setp(markerline, markerfacecolor="none", markeredgecolor="blue")
+    plt.setp(stemlines, color="b", linewidth=0.5)
+    plt.setp(baseline, color="b", linewidth=0.5)
+
+    for pred, label, color, *style in predictions:
+        ax.plot(
+            pred.get(*ep),
+            color=color,
+            linestyle=style[0] if style else "-",
+            linewidth=2,
+            label=label,
+        )
+
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel("time (s)")
+    if ylim is not None:
+        ax.set_ylim(*ylim)
+    ax.legend()
+    return ax
+```
+
 ## Loading data into pynapple
 
 In this first tutorial, we will load the RGC data into [`pynapple`](https://pynapple.org) directly from the original Matlab files via `scipy.io.loadmat`, so that every step is explicit. In later tutorials we will rely on a utility function instead, for brevity.
@@ -303,24 +356,19 @@ The whitened STA can actually be used to predict spikes because it corresponds t
 ```{code-cell} ipython3
 
 # Predicted spikes from linear-Gaussian GLM
-sppred_lgGLM = X @ wsta  
-
-# Drop initial nans
-sppred_lgGLM = sppred_lgGLM
+sppred_lgGLM = X @ wsta
 
 # get the first 1sec of non-nans
 first_valid_time = sppred_lgGLM.dropna().t[0]
 ep_1sec = first_valid_time, first_valid_time + 1
 
-plt.figure()
-markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
-plt.setp(markerline, 'markerfacecolor', 'none')
-plt.setp(markerline, 'markeredgecolor', 'blue')
-plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
-plt.title('linear-Gaussian GLM: spike count prediction')
-plt.ylabel('spike count'); plt.xlabel('time (s)')
-plt.ylim(-1.2, 4)
-plt.legend()
+plot_counts_with_predictions(
+    neuron_counts,
+    ep_1sec,
+    [(sppred_lgGLM, "lgGLM", "red")],
+    title="linear-Gaussian GLM: spike count prediction",
+    ylim=(-1.2, 4),
+)
 plt.show()
 ```
 
@@ -336,23 +384,23 @@ X_offset = np.hstack([np.ones_like(neuron_counts)[:, None], X])
 XTX_inv = np.linalg.pinv(X_offset.d[window_size:].T @ X_offset[window_size:])
 wsta_offset =  XTX_inv @ (X_offset.d[window_size:].T @ neuron_counts[window_size:]) 
 
-# splitin intercept and coefficients
+# split into intercept and coefficients
 intercept = wsta_offset[0]
 wsta_offset = wsta_offset[1:] # the linear filter part
 
 # Compute prediction with offset
 sppred_lgGLM_offset = intercept +  X @ wsta_offset
 
-plt.figure()
-markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
-plt.setp(markerline, 'markerfacecolor', 'none')
-plt.setp(markerline, 'markeredgecolor', 'blue')
-plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
-plt.plot(sppred_lgGLM_offset.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
-plt.title('linear-Gaussian GLM: spike count prediction')
-plt.ylabel('spike count'); plt.xlabel('time (s)')
-plt.ylim(-1.2, 4)
-plt.legend()
+plot_counts_with_predictions(
+    neuron_counts,
+    ep_1sec,
+    [
+        (sppred_lgGLM, "lgGLM", "red"),
+        (sppred_lgGLM_offset, "lgGLM + offset", "gold"),
+    ],
+    title="linear-Gaussian GLM: spike count prediction",
+    ylim=(-1.2, 4),
+)
 plt.show()
 
 # Let's report the relevant training error (squared prediction error on 
@@ -385,17 +433,17 @@ Let's plot the predictions and compare the resulting coefficients with the one o
 
 sppred_lgGLM_nemos = model.predict(X)
 
-plt.figure()
-markerline,_,_ = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
-plt.setp(markerline, 'markerfacecolor', 'none')
-plt.setp(markerline, 'markeredgecolor', 'blue')
-plt.plot(sppred_lgGLM.get(*ep_1sec), color='red', linewidth=2, label="lgGLM")
-plt.plot(sppred_lgGLM_offset.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
-plt.plot(sppred_lgGLM_nemos.get(*ep_1sec), "--k", label="lgGLM nemos")
-plt.title('linear-Gaussian GLM: spike count prediction')
-plt.ylabel('spike count'); plt.xlabel('time (s)')
-plt.ylim(-1.2, 4)
-plt.legend()
+plot_counts_with_predictions(
+    neuron_counts,
+    ep_1sec,
+    [
+        (sppred_lgGLM, "lgGLM", "red"),
+        (sppred_lgGLM_offset, "lgGLM + offset", "gold"),
+        (sppred_lgGLM_nemos, "lgGLM nemos", "k", "--"),
+    ],
+    title="linear-Gaussian GLM: spike count prediction",
+    ylim=(-1.2, 4),
+)
 plt.show()
 
 mse_nemos = np.nanmean((neuron_counts.d - sppred_lgGLM_nemos)**2)
@@ -428,15 +476,17 @@ ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
 ax1.set_xlabel('time before spike (s)')
 ax1.set_xlim([ttk[0], ttk[-1]])
 
-markerline,stemlines,baseline = plt.stem(neuron_counts.get(*ep_1sec).t, neuron_counts.get(*ep_1sec), linefmt='b-', basefmt='k-', label="spike ct")
-plt.setp(markerline, 'markerfacecolor', 'none')
-plt.setp(stemlines, color='b', linewidth=.5)
-plt.setp(baseline, color='b', linewidth=.5)
-ax2.plot(sppred_lgGLM_nemos.get(*ep_1sec), color='gold', linewidth=2, label="lgGLM + offset")
-ax2.plot(rate_pred_pGLM.get(*ep_1sec), label="exp-poisson GLM", c='red') 
-ax2.set_title('spike count / rate predictions')
-ax2.set_ylabel('spike count / bin'); plt.xlabel('time (s)')
-ax2.legend(loc='upper right')
+plot_counts_with_predictions(
+    neuron_counts,
+    ep_1sec,
+    [
+        (sppred_lgGLM_nemos, "lgGLM + offset", "gold"),
+        (rate_pred_pGLM, "exp-poisson GLM", "red"),
+    ],
+    title="spike count / rate predictions",
+    ylabel="spike count / bin",
+    ax=ax2,
+)
 plt.tight_layout()
 plt.show()
 ```
@@ -501,26 +551,45 @@ plt.tight_layout()
 plt.show()
 ```
 
+## Quantifying performance: log-likelihood
+
+Lastly, compute log-likelihood for the Poisson GLMs we've used so far and compare performance. The difference of the loglikelihood and homogeneous-Poisson loglikelihood, normalized by the number of spikes, gives us an intuitive way to compare log-likelihoods in units of bits / spike.  This is a quantity known as the (empirical) single-spike information. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000]. You can think of this as the number of bits (number of yes/no questions that we can answer) about the times of spikes when we know the spike rate output by the model, compared to when we only know the (constant) mean spike rate. 
+
 ```{code-cell} ipython3
 
 # comptue the **total** model log-likelihood 
 # default aggregation would be `np.mean`, giving a likelihood per-sample
 ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
-np_poisson_model.inverse_link_function = nearest_interp
+np_poisson_model.inverse_link_function = lambda x: nearest_interp(x) / neuron_counts.rate
 ll_np_pglm = np_poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
 
 # Now compute the rate under "homogeneous" Poisson model that assumes a
 # constant firing rate with the correct mean spike count.
 valid_counts = neuron_counts[window_size:].d
-ll0 = model.observation_model.log_likelihood(
+ll0 = poisson_model.observation_model.log_likelihood(
     valid_counts, 
     np.mean(valid_counts) * np.ones_like(valid_counts),
     aggregate_sample_scores=np.sum
 )
 
-(ll_exp_pglm - ll0)/valid_counts.sum()/np.log(2)
+ss_info_exp = (ll_exp_pglm - ll0)/valid_counts.sum()/np.log(2)
+ss_info_np = (ll_np_pglm - ll0)/valid_counts.sum()/np.log(2)
+print('\n empirical single-spike information:\n ---------------------- ')
+print(f'exp-GLM: {ss_info_exp:.2f} bits/sp')
+print(f' np-GLM: {ss_info_np:.2f} bits/sp')
 
-
+plot_counts_with_predictions(
+    neuron_counts,
+    ep_1sec,
+    [
+        (poisson_model.predict(X), "exp-poisson GLM", "r"),
+        (np_poisson_model.predict(X), "np-poisson GLM", "orange"),
+    ],
+    title="rate predictions",
+    ylabel="spikes / bin",
+)
+plt.tight_layout()
+plt.show()
 
 ```
