@@ -188,24 +188,24 @@ stimulus
 
 And that's it: `counts` and `stimulus` are now aligned to the same interval, sampled on the same bins, and ready for GLM modeling.
 
-## Building the Design Matrix
+## Building the design matrix
 
-Now it's time to create design matrix of our model. What we want as a predictor is the stimulus history over a fixed size window $w$. What we want is to predict is the spike counts at time $t$, $y_t$ from the stimulus at times $s_{t-1},\dots, s_{t-w}$. 
+Now it's time to build the design matrix for our model. The predictor we want is the recent stimulus history over a fixed window of $w$ samples: to predict the spike count $y_t$ at time $t$, we use the stimulus values $s_{t-1},\dots, s_{t-w}$ that precede it.
 
-The resulting design matrix will look like this,
+The resulting design matrix looks like this,
 
 $$
 X = \begin{bmatrix}
 s_{0} & s_1 & \dots & s_{w} \\
 s_{1} & s_2 & \dots & s_{w+1} \\
 \dots & \dots & \dots & \dots \\
-s_{T-w} & s_2 & \dots & s_{T} \\
+s_{T-w} & s_{T-w+1} & \dots & s_{T} \\
 \end{bmatrix} \label{eq:design-matrix}
 $$
 
-Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`. This happens because we need at least $w$ stimulus values to build a row of design matrix. 2) each row is a shifted copy of the row above. 
+Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, because we need at least $w$ stimulus values to fill a row. 2) Each row is a shifted copy of the row above.
 
-A convenient way to construct this design matrix is by convolving the stimulus with an identity matrix and reverse the column order. In `NeMoS`, the convolution with the identity can be applied via the `HistoryConv` basis. 
+A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix and then reverse the column order. In `NeMoS`, convolution with the identity is exactly what the `HistoryConv` basis does.
 
 
 ```{code-cell} ipython3
@@ -214,8 +214,8 @@ import nemos as nmo
 # Match the original notebook
 window_size = 25
 
-# define the basis object
-bas = nmo.basis.HistoryConv(25, conv_kwargs={"shift": False})
+# define the basis object, shift = False means that
+bas = nmo.basis.HistoryConv(window_size, conv_kwargs={"shift": False})
 
 # Convolve with the identity
 X = bas.compute_features(stimulus)
@@ -225,10 +225,10 @@ X = X[:,::-1]
 
 As you can see:
 
-1. The design matrix is a `pynapple` object, i.e. the information about the time series is preserved, including teh time axis and the time support.
-2. The number of samples in `X` matches that of the `stimulus`. This happens because `NeMoS` NaN pads a convolution in mode valid, which outputs $T - w$ samples. This is convenient because `X` and `counts` remains aligned.
+1. The design matrix is still a `pynapple` object: the time-series information is preserved, including the time axis and the time support.
+2. `X` has the same number of samples as `stimulus`. The convolution itself runs in `valid` mode, which produces only $T - w$ values, but `NeMoS` pads the result with NaNs back to length $T$. This keeps `X` and `counts` aligned.
 
-Note that reversing or not the column order results in equivalent designs, however changes how the columns are interpreted: if follow $~\eqref{eq:design-matrix}$, then the first column holds the stimulus values $w$ samples in the past, and the last column holds the stimulus at the current sample.
+Reversing the column order (or not) yields an equivalent design; it only changes how the columns are interpreted. Following $\eqref{eq:design-matrix}$, the first column holds the stimulus $w$ samples in the past, and the last column holds the most recent stimulus sample.
 
 ```{code-cell} ipython3
 
@@ -238,19 +238,21 @@ plt.show()
 
 ## Compute and visualize the spike-triggered average (STA)
 
-When the stimulus is Gaussian white noise, the STA provides an unbiased estimator for the filter in a GLM / LNP model (as long as the nonlinearity results in an STA whose expectation is not zero; feel free to ignore this parenthetical remark if you're not interested in technical details. It just means that if the nonlinearity is symmetric, eg. x^2, then this condition won't hold, and the STA won't be useful).
+When the stimulus is white noise, the STA is an unbiased estimator of the filter in a GLM / LNP model, as long as the nonlinearity yields an STA whose expectation is nonzero. (Feel free to skip this technical aside: it simply means that a symmetric nonlinearity, e.g. $x^2$, breaks the condition and the STA becomes uninformative.)
 
-In many cases it's useful to visualize the STA (even if your stimuli are not white noise), just because if we don't see any kind of structure then this may indicate that we have a problem (e.g., a mismatch between the design matrix and binned spike counts.
+Even when your stimulus is not white noise, it is often worth visualizing the STA: if it shows no structure at all, that is a sign something has gone wrong upstream, for example a mismatch between the design matrix and the binned spike counts.
 
 
 ```{code-cell} ipython3
+import numpy as np
+
 neuron_count = counts[:, cell_idx]
 
 # skip nans
 sta = (X.d[window_size:].T @ neuron_count[window_size:]) / neuron_count.sum()
 
 ttk = np.arange(-window_size+1,1) / neuron_count.rate  # time bins for STA (in seconds)
-plt.clf()
+
 plt.figure(figsize=[12,8])
 plt.plot(ttk,ttk*0, 'k--')
 plt.plot(ttk, sta, 'bo-')
