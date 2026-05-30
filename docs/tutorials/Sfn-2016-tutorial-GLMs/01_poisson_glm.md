@@ -6,8 +6,8 @@ jupytext:
     format_version: 0.13
     jupytext_version: 1.19.3
 kernelspec:
-  name: python3
   language: python
+  name: python3
   display_name: Python 3 (ipykernel)
 ---
 
@@ -180,8 +180,8 @@ plt.ylim(-0.66, 0.8)
 plt.xlabel("time (s)")
 plt.legend()
 plt.show()
-
 ```
+
 ## Pre-processing
 
 A Poisson GLM predicts a spike count at each time bin from the stimulus in that bin (and, later, from the recent stimulus and spike history). For the model inputs and outputs to line up, we need three things:
@@ -238,6 +238,7 @@ ax.plot(units[cell_idx].get(0, 1).fillna(-0.2), "|", color="k", label="spikes")
 ax.legend()
 plt.show()
 ```
+
 The last step is to put the stimulus on these exact bins. We do this with `value_from`, which, for every timestamp in `counts.t`, looks up a value from the stimulus. Using `mode="before"` picks the most recent stimulus sample at or before each count bin, which is the causally correct choice: the count in a bin can only be driven by stimulus that has already been presented, never by a future frame.
 
 ```{code-cell} ipython3
@@ -267,7 +268,6 @@ Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, becau
 
 A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix and then reverse the column order. In `NeMoS`, convolution with the identity is exactly what the `HistoryConv` basis does.
 
-
 ```{code-cell} ipython3
 import nemos as nmo
 
@@ -291,7 +291,6 @@ As you can see:
 Reversing the column order (or not) yields an equivalent design; it only changes how the columns are interpreted. Following $\eqref{eq:design-matrix}$, the first column holds the stimulus $w$ samples in the past, and the last column holds the most recent stimulus sample.
 
 ```{code-cell} ipython3
-
 plt.pcolormesh(X[window_size:window_size+50], cmap="Pastel1")
 plt.show()
 ```
@@ -301,7 +300,6 @@ plt.show()
 When the stimulus is white noise, the STA is an unbiased estimator of the filter in a GLM / LNP model, as long as the nonlinearity yields an STA whose expectation is nonzero. (Feel free to skip this technical aside: it simply means that a symmetric nonlinearity, e.g. $x^2$, breaks the condition and the STA becomes uninformative.)
 
 Even when your stimulus is not white noise, it is often worth visualizing the STA: if it shows no structure at all, that is a sign something has gone wrong upstream, for example a mismatch between the design matrix and the binned spike counts.
-
 
 ```{code-cell} ipython3
 import numpy as np
@@ -346,7 +344,6 @@ If the stimuli are non-white, then the STA is generally a biased estimator for t
 If the stimuli have correlations this ML estimate may look like garbage (more on this later when we come to "regularization").  But for this dataset the stimuli are white, so we don't (in general) expect a big difference from the STA (this is because `X.T @ X` is  close to a scaled version of the identity).
 
 ```{code-cell} ipython3
-
 # Whitened STA (or linear regression via the analytical formula)
 wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
@@ -365,9 +362,7 @@ plt.show()
 
 The whitened STA can actually be used to predict spikes because it corresponds to a proper estimate of the model parameters (i.e., for a Gaussian GLM). Let's inspect this prediction.
 
-
 ```{code-cell} ipython3
-
 # Predicted spikes from linear-Gaussian GLM
 pred_lin_gauss = X @ wsta
 
@@ -387,9 +382,7 @@ plt.show()
 
 We can clearly see that we forgot to include an offset or "intercept" term to our design matrix, which will allow our prediction to have a non-zero mean (since the stimulus here was normalized to have zero mean).
 
-
 ```{code-cell} ipython3
-
 # Add an offset (constant column in the design)
 X_offset = np.hstack([np.ones_like(neuron_counts)[:, None], X])
 X_offset_valid = X_offset.dropna()
@@ -431,7 +424,6 @@ print("Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}".format(1-mse2/rss)
 We just computed the whitened STA by hand, with the least-squares formula. That estimate is the maximum-likelihood filter of a GLM with a Gaussian noise model and an identity link. NeMoS can fit that same model for us, so let's check that the two agree.
 
 ```{code-cell} ipython3
-
 # Define a model object
 gaussian_glm = nmo.glm.GLM(observation_model="Gaussian", solver_name="BFGS")
 gaussian_glm.fit(X, neuron_counts)
@@ -444,7 +436,6 @@ As we can see, all we had to set is the observation model to `Gaussian`, default
 Let's plot the predictions and compare the resulting coefficients with the one obtained via the analytical formula.
 
 ```{code-cell} ipython3
-
 pred_lin_gauss_nemos = gaussian_glm.predict(X)
 
 plot_counts(
@@ -504,15 +495,11 @@ plt.tight_layout()
 plt.show()
 ```
 
-
-
 ## Non-parametric estimate of the nonlinearity
 
 A way to estimate the non-linearity from the data is computing the filtered stimulus (the rate before the non-linearity is applied), bin it over the range, and compute the mean firing rate per each bin. What I just described is just a tuning curve, and `pynapple` has built-in functions for this.
 
-
 ```{code-cell} ipython3
-
 # The filtered stimulus is the GLM's linear predictor: its output *before* the
 # nonlinearity, i.e. X @ coef + intercept.
 raw_filter_output = X @ exp_poisson_glm.coef_ + exp_poisson_glm.intercept_
@@ -522,7 +509,6 @@ tc = nap.compute_tuning_curves(units[cell_idx], raw_filter_output.dropna(), bins
 
 tc.plot()
 plt.show()
-
 ```
 
 Let's convert our tuning curve to a function by nearest-neighbor interpolation, using a simple jax reimplementation of `scipy.interp1d` with `kind="nearest"` and `fill_value="extrapolate"`. We then plug it straight into a GLM as the inverse link function, reusing the exp-GLM's fitted filter rather than refitting.
@@ -601,7 +587,7 @@ Putting the pieces together, the single-spike information is the per-spike, base
 n_spikes = counts_valid.sum()
 ss_info_exp = float((ll_exp - ll_null) / n_spikes / np.log(2))
 ss_info_np = float((ll_np - ll_null) / n_spikes / np.log(2))
-print("\nempirical single-spike information:\n---------------------- ")
+print("\nempirical single-spike information:\n-----------------------------------")
 print(f"exp-GLM: {ss_info_exp:.2f} bits/sp")
 print(f" np-GLM: {ss_info_np:.2f} bits/sp")
 ```
@@ -622,3 +608,63 @@ plot_counts(
 plt.tight_layout()
 plt.show()
 ```
+
+## Quantifying performance: AIC
+
+Single-spike information rewards a model for fitting the spikes, but says nothing about how many parameters that fit cost. A more flexible model can always match the data better, so to compare models fairly we need a criterion that charges for complexity. The Akaike Information Criterion (AIC) does exactly that:
+
+$$
+\text{AIC} = -2\,\log\text{-likelihood} + 2k,
+$$
+
+where $k$ is the number of free parameters; lower is better. Our two Poisson models share the same filter (an intercept plus the `window_size` weights) and differ only in the nonlinearity: the exponential model adds no parameters, while the nonparametric model spends one per tuning-curve bin.
+
+```{code-cell} ipython3
+n_nonlin_bins = tc.linpred.size  # one parameter per tuning-curve bin
+
+n_params_exp = 1 + window_size                 # intercept + filter
+n_params_np = 1 + window_size + n_nonlin_bins  # + nonlinearity bins
+
+aic_exp = float(-2 * ll_exp + 2 * n_params_exp)
+aic_np = float(-2 * ll_np + 2 * n_params_np)
+
+print(f"AIC  exp-GLM: {aic_exp:.1f}")
+print(f"AIC   np-GLM: {aic_np:.1f}")
+winner = "nonparametric" if aic_np < aic_exp else "exponential"
+print(f"\nAIC favors the {winner} nonlinearity.")
+```
+
+Here the nonparametric model wins despite its extra parameters: the improvement in fit more than pays for them. One caveat — we never refit the filter for the nonparametric model (we reused the exponential GLM's weights), so its log-likelihood is an underestimate. A proper joint fit of filter and nonlinearity would only widen the gap.
+
+## Simulating from the GLM
+
+A fitted GLM is a generative model: given a stimulus, it defines a firing rate and a Poisson process we can draw spikes from. NeMoS exposes this through `simulate`, which takes a random key and the feed-forward input and returns simulated spike counts together with the rate that generated them.
+
+Drawing many repeats over the same stimulus window gives us a raster — the model's analogue of repeating a stimulus across trials in an experiment.
+
+```{code-cell} ipython3
+# A short window of the (valid) design matrix to drive the simulation.
+sim_window = X_valid.get(X_valid.t[0], X_valid.t[0] + 0.5)
+n_repeats = 50
+
+# One spike train per repeat, each with its own random key.
+keys = jax.random.split(jax.random.key(0), n_repeats)
+sim_spikes = np.stack([exp_poisson_glm.simulate(k, sim_window)[0] for k in keys])
+
+fig, (ax_rate, ax_raster) = plt.subplots(
+    2, figsize=(8, 5), sharex=True, height_ratios=[1, 3]
+)
+ax_rate.plot(exp_poisson_glm.predict(sim_window), color=PALETTE[0])
+ax_rate.set_ylabel("rate (spikes/bin)")
+ax_rate.set_title("simulated GLM responses")
+ax_raster.imshow(
+    sim_spikes, aspect="auto", cmap="Greys",
+    extent=[sim_window.t[0], sim_window.t[-1], n_repeats, 0],
+)
+ax_raster.set_xlabel("time (s)")
+ax_raster.set_ylabel("repeat #")
+plt.tight_layout()
+plt.show()
+```
+
+The simulated trains cluster where the predicted rate is high and thin out where it is low: the model reproduces the temporal structure of the response, not just the average rate.
