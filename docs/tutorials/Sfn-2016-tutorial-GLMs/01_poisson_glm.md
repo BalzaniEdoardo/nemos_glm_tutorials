@@ -562,10 +562,10 @@ np_poisson_glm.intercept_ = exp_poisson_glm.intercept_
 np_poisson_glm.scale_ = exp_poisson_glm.scale_
 
 # Plot exponential and nonparametric nonlinearity estimate
-fig, ax = plt.subplots(1, figsize=(10,4)) 
+fig, ax = plt.subplots(1, figsize=(6,4)) 
 x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
-ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c=PALETTE[0])
-ax.plot(x, nearest_interp(x), label='nonparametric f', c=PALETTE[1])
+ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c=PALETTE[0], lw=2)
+ax.plot(x, nearest_interp(x), label='nonparametric f', c=PALETTE[1], lw=2)
 ax.set_xlabel('filter output')
 ax.set_ylabel('rate (sp/s)')
 ax.legend(loc='upper left')
