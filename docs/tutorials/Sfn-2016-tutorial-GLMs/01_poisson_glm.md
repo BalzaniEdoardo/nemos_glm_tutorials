@@ -163,7 +163,7 @@ print(f"Time bin size: {1000./stimulus.rate :.2} ms")
 
 Finally, let's plot one second of the time series. We can use the `get` method to extract a specific time interval.
 
-```{code-cell} ipython
+```{code-cell} ipython3
 import matplotlib.pyplot as plt
 
 cell_idx = 2
