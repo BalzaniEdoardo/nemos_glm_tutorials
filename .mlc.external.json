@@ -4,7 +4,8 @@
     { "pattern": "^/" },
     { "pattern": "^../" },
     { "pattern": "^[^/]+$" },
-    { "comment": "RGC dataset zip, gated behind a permission request", "pattern": "^https://pillowlab\\.princeton\\.edu/data/data_RGCs\\.zip" }
+    { "comment": "RGC dataset zip, gated behind a permission request", "pattern": "^https://pillowlab\\.princeton\\.edu/data/data_RGCs\\.zip" },
+    { "comment": "Own GitHub Pages site; 404s until Pages is enabled and first deployed", "pattern": "^https://balzaniedoardo\\.github\\.io/nemos_glm_tutorials" }
   ],
   "aliveStatusCodes": [200, 206, 302, 400, 403, 503, 504, 0],
   "timeout": "20s",
