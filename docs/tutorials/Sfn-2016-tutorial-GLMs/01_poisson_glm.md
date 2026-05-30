@@ -42,12 +42,20 @@ data_paths
 :tags: [hide-input]
 
 import matplotlib.pyplot as plt
+import numpy as np
+
+# Soft, qualitative palette reused across the whole notebook.
+PALETTE = plt.cm.Pastel1.colors
 
 
 def plot_counts_with_predictions(
     counts, ep, predictions, title="", ylabel="spike count", ylim=None, ax=None
 ):
-    """Stem-plot binned spike counts over `ep` and overlay one or more model predictions.
+    """Show binned spike counts over `ep` and overlay one or more model predictions.
+
+    The counts are drawn as a soft gray filled step (so zero-count bins still
+    show a baseline), and each prediction as a line. Line colors default to a
+    pastel palette, cycling in order; pass an explicit color to override.
 
     Parameters
     ----------
@@ -56,7 +64,9 @@ def plot_counts_with_predictions(
     ep:
         ``(start, end)`` interval in seconds, forwarded to ``.get``.
     predictions:
-        List of ``(tsd, label, color)`` or ``(tsd, label, color, linestyle)`` tuples.
+        List of ``(tsd, label)`` tuples. Optionally append a color (or ``None``
+        to keep cycling the palette) and a linestyle: ``(tsd, label, color,
+        linestyle)``.
     title, ylabel, ylim:
         Standard axis cosmetics.
     ax:
@@ -66,28 +76,29 @@ def plot_counts_with_predictions(
         _, ax = plt.subplots(figsize=(8, 4))
 
     c = counts.get(*ep)
-    markerline, stemlines, baseline = ax.stem(
-        c.t, c.d, linefmt="b-", basefmt="k-", label="spike ct"
+    half = 0.5 / counts.rate
+    edges = np.append(c.t - half, c.t[-1] + half)
+    ax.stairs(
+        c.d, edges, fill=True, facecolor="0.88", edgecolor="0.55",
+        linewidth=0.8, label="spike count", zorder=1,
     )
-    plt.setp(markerline, markerfacecolor="none", markeredgecolor="blue")
-    plt.setp(stemlines, color="b", linewidth=0.5)
-    plt.setp(baseline, color="b", linewidth=0.5)
 
-    for pred, label, color, *style in predictions:
-        ax.plot(
-            pred.get(*ep),
-            color=color,
-            linestyle=style[0] if style else "-",
-            linewidth=2,
-            label=label,
-        )
+    color_idx = 0
+    for pred, label, *style in predictions:
+        explicit = bool(style) and style[0] is not None
+        color = style[0] if explicit else PALETTE[color_idx % len(PALETTE)]
+        linestyle = style[1] if len(style) > 1 else "-"
+        ax.plot(pred.get(*ep), color=color, linestyle=linestyle, linewidth=2,
+                label=label, zorder=3)
+        if not explicit:
+            color_idx += 1
 
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.set_xlabel("time (s)")
     if ylim is not None:
         ax.set_ylim(*ylim)
-    ax.legend()
+    ax.legend(fontsize=8, framealpha=0.6)
     return ax
 ```
 
@@ -314,8 +325,8 @@ sta = (X_valid.d.T @ counts_valid.d) / neuron_counts.sum()
 ttk = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
 
 plt.figure()
-plt.plot(ttk,ttk*0, 'k--')
-plt.plot(ttk, sta, 'bo-')
+plt.axhline(0, color="0.7", linestyle="--")
+plt.plot(ttk, sta, "o-", color=PALETTE[0])
 plt.title('STA')
 plt.xlabel('time before spike (s)')
 plt.xlim([ttk[0],ttk[-1]])
@@ -344,9 +355,9 @@ If the stimuli have correlations this ML estimate may look like garbage (more on
 wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
 plt.figure()
-plt.plot(ttk,ttk*0, 'k--')
-plt.plot(ttk, sta/np.linalg.norm(sta), 'bo-', label="STA")
-plt.plot(ttk, wsta/np.linalg.norm(wsta), 'ro-', label="wSTA")
+plt.axhline(0, color="0.7", linestyle="--")
+plt.plot(ttk, sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
+plt.plot(ttk, wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
 plt.title('STA and whitened STA')
 plt.xlabel('time before spike (s)')
 plt.xlim([ttk[0],ttk[-1]])
@@ -371,7 +382,7 @@ ep_1sec = first_valid_time, first_valid_time + 1
 plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
-    [(pred_lin_gauss, "lgGLM", "red")],
+    [(pred_lin_gauss, "lgGLM")],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
 )
@@ -402,8 +413,8 @@ plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (pred_lin_gauss, "lgGLM", "red"),
-        (pred_lin_gauss_offset, "lgGLM + offset", "gold"),
+        (pred_lin_gauss, "lgGLM"),
+        (pred_lin_gauss_offset, "lgGLM + offset"),
     ],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
@@ -444,9 +455,9 @@ plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (pred_lin_gauss, "lgGLM", "red"),
-        (pred_lin_gauss_offset, "lgGLM + offset", "gold"),
-        (pred_lin_gauss_nemos, "lgGLM nemos", "k", "--"),
+        (pred_lin_gauss, "lgGLM"),
+        (pred_lin_gauss_offset, "lgGLM + offset"),
+        (pred_lin_gauss_nemos, "lgGLM nemos", None, "--"),
     ],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
@@ -475,8 +486,8 @@ rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(ttk, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c='gold')
-ax1.plot(ttk, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c='red')
+ax1.plot(ttk, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
+ax1.plot(ttk, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
 ax1.legend(loc = 'upper left')
 ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
 ax1.set_xlabel('time before spike (s)')
@@ -486,8 +497,8 @@ plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (pred_lin_gauss_nemos, "lgGLM + offset", "gold"),
-        (rate_exp_poisson_glm, "exp-poisson GLM", "red"),
+        (pred_lin_gauss_nemos, "lgGLM + offset"),
+        (rate_exp_poisson_glm, "exp-poisson GLM"),
     ],
     title="spike count / rate predictions",
     ylabel="spike count / bin",
@@ -553,8 +564,8 @@ np_poisson_glm.scale_ = exp_poisson_glm.scale_
 # Plot exponential and nonparametric nonlinearity estimate
 fig, ax = plt.subplots(1, figsize=(10,4)) 
 x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
-ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c='b')
-ax.plot(x, nearest_interp(x), label='nonparametric f', c='orange')
+ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c=PALETTE[0])
+ax.plot(x, nearest_interp(x), label='nonparametric f', c=PALETTE[1])
 ax.set_xlabel('filter output')
 ax.set_ylabel('rate (sp/s)')
 ax.legend(loc='upper left')
@@ -609,8 +620,8 @@ plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (exp_poisson_glm.predict(X), "exp-poisson GLM", "r"),
-        (np_poisson_glm.predict(X), "np-poisson GLM", "orange"),
+        (exp_poisson_glm.predict(X), "exp-poisson GLM"),
+        (np_poisson_glm.predict(X), "np-poisson GLM"),
     ],
     title="rate predictions",
     ylabel="spikes / bin",
