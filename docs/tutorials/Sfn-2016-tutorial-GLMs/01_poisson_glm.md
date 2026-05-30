@@ -301,9 +301,15 @@ import numpy as np
 
 neuron_counts = counts[:, cell_idx]
 
-# Skip the nans. Note that transposition in pynapple doesn't work, so we grabbed
-# the data attribute `d` (which is a numpy array).
-sta = (X.d[window_size:].T @ neuron_counts[window_size:]) / neuron_counts.sum()
+# Drop the NaN-padded rows of the design matrix, then align the counts to the
+# bins that remain via their shared time support.
+X_valid = X.dropna()
+counts_valid = neuron_counts.restrict(X_valid.time_support)
+
+# Note: transposition isn't defined for pynapple objects, so we use the data
+# attribute `d` (a numpy array) for the matrix algebra. We normalize by the
+# total spike count, following the standard STA definition.
+sta = (X_valid.d.T @ counts_valid.d) / neuron_counts.sum()
 
 ttk = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
 
@@ -335,7 +341,7 @@ If the stimuli have correlations this ML estimate may look like garbage (more on
 ```{code-cell} ipython3
 
 # Whitened STA (or linear regression via the analytical formula)
-wsta = np.linalg.pinv(X.d[window_size:].T @ X[window_size:]) @ sta * neuron_counts.sum()
+wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
 plt.figure()
 plt.plot(ttk,ttk*0, 'k--')
@@ -356,16 +362,16 @@ The whitened STA can actually be used to predict spikes because it corresponds t
 ```{code-cell} ipython3
 
 # Predicted spikes from linear-Gaussian GLM
-sppred_lgGLM = X @ wsta
+pred_lin_gauss = X @ wsta
 
 # get the first 1sec of non-nans
-first_valid_time = sppred_lgGLM.dropna().t[0]
+first_valid_time = pred_lin_gauss.dropna().t[0]
 ep_1sec = first_valid_time, first_valid_time + 1
 
 plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
-    [(sppred_lgGLM, "lgGLM", "red")],
+    [(pred_lin_gauss, "lgGLM", "red")],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
 )
@@ -379,24 +385,25 @@ We can clearly see that we forgot to include an offset or "intercept" term to ou
 
 # Add an offset (constant column in the design)
 X_offset = np.hstack([np.ones_like(neuron_counts)[:, None], X])
+X_offset_valid = X_offset.dropna()
 
 # Compute the linear-Gaussian ML estimator
-XTX_inv = np.linalg.pinv(X_offset.d[window_size:].T @ X_offset[window_size:])
-wsta_offset =  XTX_inv @ (X_offset.d[window_size:].T @ neuron_counts[window_size:]) 
+XTX_inv = np.linalg.pinv(X_offset_valid.d.T @ X_offset_valid.d)
+wsta_offset = XTX_inv @ (X_offset_valid.d.T @ counts_valid.d)
 
 # split into intercept and coefficients
 intercept = wsta_offset[0]
 wsta_offset = wsta_offset[1:] # the linear filter part
 
 # Compute prediction with offset
-sppred_lgGLM_offset = intercept +  X @ wsta_offset
+pred_lin_gauss_offset = intercept +  X @ wsta_offset
 
 plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (sppred_lgGLM, "lgGLM", "red"),
-        (sppred_lgGLM_offset, "lgGLM + offset", "gold"),
+        (pred_lin_gauss, "lgGLM", "red"),
+        (pred_lin_gauss_offset, "lgGLM + offset", "gold"),
     ],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
@@ -405,8 +412,8 @@ plt.show()
 
 # Let's report the relevant training error (squared prediction error on 
 # training data) so far just to see how we're doing:
-mse1 = np.nanmean((neuron_counts.d - sppred_lgGLM)**2)   # mean squared error, GLM no offset
-mse2 = np.nanmean((neuron_counts.d - sppred_lgGLM_offset)**2)  # mean squared error, with offset
+mse1 = np.nanmean((neuron_counts.d - pred_lin_gauss)**2)   # mean squared error, GLM no offset
+mse2 = np.nanmean((neuron_counts.d - pred_lin_gauss_offset)**2)  # mean squared error, with offset
 rss = np.nanmean((neuron_counts.d - np.mean(neuron_counts))**2)    # squared error of spike train
 print('Training perf (R^2): lin-gauss GLM, no offset: {:.2f}'.format(1-mse1/rss))
 print('Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}'.format(1-mse2/rss))
@@ -431,22 +438,22 @@ Let's plot the predictions and compare the resulting coefficients with the one o
 
 ```{code-cell} ipython3
 
-sppred_lgGLM_nemos = gaussian_glm.predict(X)
+pred_lin_gauss_nemos = gaussian_glm.predict(X)
 
 plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (sppred_lgGLM, "lgGLM", "red"),
-        (sppred_lgGLM_offset, "lgGLM + offset", "gold"),
-        (sppred_lgGLM_nemos, "lgGLM nemos", "k", "--"),
+        (pred_lin_gauss, "lgGLM", "red"),
+        (pred_lin_gauss_offset, "lgGLM + offset", "gold"),
+        (pred_lin_gauss_nemos, "lgGLM nemos", "k", "--"),
     ],
     title="linear-Gaussian GLM: spike count prediction",
     ylim=(-1.2, 4),
 )
 plt.show()
 
-mse_nemos = np.nanmean((neuron_counts.d - sppred_lgGLM_nemos)**2)
+mse_nemos = np.nanmean((neuron_counts.d - pred_lin_gauss_nemos)**2)
 print('Training perf (R^2): lin-gauss GLM, nemos: {:.2f}'.format(1-mse_nemos/rss))
 ```
 
@@ -463,7 +470,7 @@ exp_poisson_glm
 The predicted rate comes from the same `predict` method. Let's compare the two filters and their predictions side by side.
 
 ```{code-cell} ipython3
-rate_pred_pGLM = exp_poisson_glm.predict(X)
+rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
@@ -479,8 +486,8 @@ plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (sppred_lgGLM_nemos, "lgGLM + offset", "gold"),
-        (rate_pred_pGLM, "exp-poisson GLM", "red"),
+        (pred_lin_gauss_nemos, "lgGLM + offset", "gold"),
+        (rate_exp_poisson_glm, "exp-poisson GLM", "red"),
     ],
     title="spike count / rate predictions",
     ylabel="spike count / bin",
