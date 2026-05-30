@@ -1,11 +1,11 @@
-# GLM Tutorials
+# Data Science & Data Skills for Neuroscientists (J.W. Pillow, SfN 2016)
 
 The material proposed in these tutorials revisits what was presented by [Jonathan Pillow](https://pillowlab.princeton.edu) in a "short course" on [Data Science and Data Skills for Neuroscientists](https://neuronline.sfn.org/scientific-research/data-science-and-data-skills-for-neuroscientists) organized at the SFN 2016 meeting, constructing and fitting models with [`pynapple`](https://pynapple.org/) and [`NeMoS`](https://nemos.readthedocs.io/en/latest/index.html).
 
 The original Matlab implementation and its python translation can be found at the following links:
 
-- Matlab: https://github.com/pillowlab/GLMspiketraintutorial
-- Python:  https://github.com/pillowlab/GLMspiketraintutorial_python
+- Matlab: [https://github.com/pillowlab/GLMspiketraintutorial](https://github.com/pillowlab/GLMspiketraintutorial)
+- Python:  [https://github.com/pillowlab/GLMspiketraintutorial_python](https://github.com/pillowlab/GLMspiketraintutorial_python)
 
 
 <h2 style="font-size: 2em; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">Contents</h2>

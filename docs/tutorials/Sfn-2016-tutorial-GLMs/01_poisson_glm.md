@@ -261,8 +261,8 @@ s_{0} & s_1 & \dots & s_{w} \\
 s_{1} & s_2 & \dots & s_{w+1} \\
 \dots & \dots & \dots & \dots \\
 s_{T-w} & s_{T-w+1} & \dots & s_{T} \\
-\end{bmatrix} \label{eq:design-matrix}
-$$
+\end{bmatrix}
+$$ (eq-design-matrix)
 
 Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, because we need at least $w$ stimulus values to fill a row. 2) Each row is a shifted copy of the row above.
 
@@ -288,7 +288,7 @@ As you can see:
 1. The design matrix is still a `pynapple` object: the time-series information is preserved, including the time axis and the time support.
 2. `X` has the same number of samples as `stimulus`. The convolution itself runs in `valid` mode, which produces only $T - w$ values, but `NeMoS` pads the result with NaNs back to length $T$. This keeps `X` and `counts` aligned.
 
-Reversing the column order (or not) yields an equivalent design; it only changes how the columns are interpreted. Following $\eqref{eq:design-matrix}$, the first column holds the stimulus $w$ samples in the past, and the last column holds the most recent stimulus sample.
+Reversing the column order (or not) yields an equivalent design; it only changes how the columns are interpreted. Following {eq}`eq-design-matrix`, the first column holds the stimulus $w$ samples in the past, and the last column holds the most recent stimulus sample.
 
 ```{code-cell} ipython3
 plt.pcolormesh(X[window_size:window_size+50], cmap="Pastel1")
@@ -561,7 +561,7 @@ plt.show()
 
 How well does each model actually describe the spikes? A natural measure is the log-likelihood: how probable the observed counts are under the rates the model predicts.
 
-A raw log-likelihood is hard to read on its own, so we compare it against a baseline that ignores the stimulus and fires at a constant mean rate. The difference between the two log-likelihoods, divided by the number of spikes and converted to base 2, is the **single-spike information**: the bits per spike we gain by knowing the model's rate rather than just the mean rate. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000].
+A raw log-likelihood is hard to read on its own, so we compare it against a baseline that ignores the stimulus and fires at a constant mean rate. The difference between the two log-likelihoods, divided by the number of spikes and converted to base 2, is the **single-spike information**: the bits per spike we gain by knowing the model's rate rather than just the mean rate. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000](https://www.princeton.edu/~wbialek/our_papers/brenner+al_00b.pdf).
 
 Computing it needs three pieces: the log-likelihood of each fitted GLM, the log-likelihood of the constant-rate baseline, and the total spike count. We'll build them one at a time, working on the valid (non-padded) bins we already prepared earlier, `X_valid` and `counts_valid`.
 

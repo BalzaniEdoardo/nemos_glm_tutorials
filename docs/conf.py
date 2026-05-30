@@ -16,6 +16,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
     "sphinx_copybutton",
+    "sphinx_togglebutton",      # collapsible admonitions (`:class: dropdown`)
 ]
 
 # Treat .md files as MyST notebooks (executed via myst-nb).

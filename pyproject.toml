@@ -67,6 +67,7 @@ docs = [
     "myst-nb",                      # Parse + execute MyST-Markdown notebooks
     "sphinx-book-theme",            # HTML theme used in conf.py
     "sphinx-copybutton",            # "copy" button on code blocks
+    "sphinx-togglebutton",          # Collapsible (dropdown) admonitions
     "ipykernel",                    # Kernel used by myst-nb to execute notebooks
     # Runtime deps needed to *execute* the tutorial notebooks at build time
     "pynapple",
