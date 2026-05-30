@@ -322,14 +322,14 @@ counts_valid = neuron_counts.restrict(X_valid.time_support)
 # total spike count, following the standard STA definition.
 sta = (X_valid.d.T @ counts_valid.d) / neuron_counts.sum()
 
-ttk = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
+lag_times. = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(ttk, sta, "o-", color=PALETTE[0])
+plt.plot(lag_times., sta, "o-", color=PALETTE[0])
 plt.title('STA')
 plt.xlabel('time before spike (s)')
-plt.xlim([ttk[0],ttk[-1]])
+plt.xlim([lag_times.[0],lag_times.[-1]])
 plt.show()
 ```
 
@@ -356,11 +356,11 @@ wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(ttk, sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
-plt.plot(ttk, wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
+plt.plot(lag_times., sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
+plt.plot(lag_times., wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
 plt.title('STA and whitened STA')
 plt.xlabel('time before spike (s)')
-plt.xlim([ttk[0],ttk[-1]])
+plt.xlim([lag_times.[0],lag_times.[-1]])
 plt.legend()
 plt.show()
 ```
@@ -486,12 +486,12 @@ rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(ttk, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
-ax1.plot(ttk, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
+ax1.plot(lag_times., gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
+ax1.plot(lag_times., exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
 ax1.legend(loc = 'upper left')
 ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
 ax1.set_xlabel('time before spike (s)')
-ax1.set_xlim([ttk[0], ttk[-1]])
+ax1.set_xlim([lag_times.[0], lag_times.[-1]])
 
 plot_counts_with_predictions(
     neuron_counts,
