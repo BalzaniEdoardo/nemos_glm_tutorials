@@ -48,10 +48,10 @@ import numpy as np
 PALETTE = plt.cm.Pastel1.colors
 
 
-def plot_counts_with_predictions(
-    counts, ep, predictions, title="", ylabel="spike count", ylim=None, ax=None
+def plot_counts(
+    counts, ep, predictions=(), title="", ylabel="spike count", ylim=None, ax=None
 ):
-    """Show binned spike counts over `ep` and overlay one or more model predictions.
+    """Show binned spike counts over `ep`, optionally overlaying model predictions.
 
     The counts are drawn as a soft gray filled step (so zero-count bins still
     show a baseline), and each prediction as a line. Line colors default to a
@@ -64,9 +64,9 @@ def plot_counts_with_predictions(
     ep:
         ``(start, end)`` interval in seconds, forwarded to ``.get``.
     predictions:
-        List of ``(tsd, label)`` tuples. Optionally append a color (or ``None``
-        to keep cycling the palette) and a linestyle: ``(tsd, label, color,
-        linestyle)``.
+        Optional list of ``(tsd, label)`` tuples. Optionally append a color (or
+        ``None`` to keep cycling the palette) and a linestyle: ``(tsd, label,
+        color, linestyle)``.
     title, ylabel, ylim:
         Standard axis cosmetics.
     ax:
@@ -233,13 +233,9 @@ counts
 The counts are now regularly binned over the whole time support. Let's plot the counts overlaid with the spike times.
 
 ```{code-cell} ipython3
-plt.figure()
-plt.plot(counts[:, cell_idx].get(0, 1), label="spike counts")
-plt.plot(units[cell_idx].get(0, 1).fillna(-0.2), "|", color="k", label="spikes")
-plt.title('binned spike counts')
-plt.ylabel('spike count')
-plt.xlabel('time (s)')
-plt.legend()
+ax = plot_counts(counts[:, cell_idx], (0, 1), title="binned spike counts")
+ax.plot(units[cell_idx].get(0, 1).fillna(-0.2), "|", color="k", label="spikes")
+ax.legend()
 plt.show()
 ```
 The last step is to put the stimulus on these exact bins. We do this with `value_from`, which, for every timestamp in `counts.t`, looks up a value from the stimulus. Using `mode="before"` picks the most recent stimulus sample at or before each count bin, which is the causally correct choice: the count in a bin can only be driven by stimulus that has already been presented, never by a future frame.
@@ -327,8 +323,8 @@ lag_times = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for ST
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
 plt.plot(lag_times, sta, "o-", color=PALETTE[0])
-plt.title('STA')
-plt.xlabel('time before spike (s)')
+plt.title("STA")
+plt.xlabel("time before spike (s)")
 plt.xlim([lag_times[0],lag_times[-1]])
 plt.show()
 ```
@@ -358,8 +354,8 @@ plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
 plt.plot(lag_times, sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
 plt.plot(lag_times, wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
-plt.title('STA and whitened STA')
-plt.xlabel('time before spike (s)')
+plt.title("STA and whitened STA")
+plt.xlabel("time before spike (s)")
 plt.xlim([lag_times[0],lag_times[-1]])
 plt.legend()
 plt.show()
@@ -379,7 +375,7 @@ pred_lin_gauss = X @ wsta
 first_valid_time = pred_lin_gauss.dropna().t[0]
 ep_1sec = first_valid_time, first_valid_time + 1
 
-plot_counts_with_predictions(
+plot_counts(
     neuron_counts,
     ep_1sec,
     [(pred_lin_gauss, "lgGLM")],
@@ -409,7 +405,7 @@ wsta_offset = wsta_offset[1:] # the linear filter part
 # Compute prediction with offset
 pred_lin_gauss_offset = intercept +  X @ wsta_offset
 
-plot_counts_with_predictions(
+plot_counts(
     neuron_counts,
     ep_1sec,
     [
@@ -426,8 +422,8 @@ plt.show()
 mse1 = np.nanmean((neuron_counts.d - pred_lin_gauss)**2)   # mean squared error, GLM no offset
 mse2 = np.nanmean((neuron_counts.d - pred_lin_gauss_offset)**2)  # mean squared error, with offset
 rss = np.nanmean((neuron_counts.d - np.mean(neuron_counts))**2)    # squared error of spike train
-print('Training perf (R^2): lin-gauss GLM, no offset: {:.2f}'.format(1-mse1/rss))
-print('Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}'.format(1-mse2/rss))
+print("Training perf (R^2): lin-gauss GLM, no offset: {:.2f}".format(1-mse1/rss))
+print("Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}".format(1-mse2/rss))
 ```
 
 ## Linear-Gaussian GLM with NeMoS
@@ -451,7 +447,7 @@ Let's plot the predictions and compare the resulting coefficients with the one o
 
 pred_lin_gauss_nemos = gaussian_glm.predict(X)
 
-plot_counts_with_predictions(
+plot_counts(
     neuron_counts,
     ep_1sec,
     [
@@ -465,7 +461,7 @@ plot_counts_with_predictions(
 plt.show()
 
 mse_nemos = np.nanmean((neuron_counts.d - pred_lin_gauss_nemos)**2)
-print('Training perf (R^2): lin-gauss GLM, nemos: {:.2f}'.format(1-mse_nemos/rss))
+print("Training perf (R^2): lin-gauss GLM, nemos: {:.2f}".format(1-mse_nemos/rss))
 ```
 
 ## Poisson GLM
@@ -486,14 +482,14 @@ rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(lag_times, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
-ax1.plot(lag_times, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
-ax1.legend(loc = 'upper left')
-ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
-ax1.set_xlabel('time before spike (s)')
+ax1.plot(lag_times, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), "o-", label="lin-gauss GLM filt", c=PALETTE[0])
+ax1.plot(lag_times, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), "o-", label="poisson GLM filt", c=PALETTE[1])
+ax1.legend(loc = "upper left")
+ax1.set_title("(normalized) linear-Gaussian and Poisson GLM filter estimates")
+ax1.set_xlabel("time before spike (s)")
 ax1.set_xlim([lag_times[0], lag_times[-1]])
 
-plot_counts_with_predictions(
+plot_counts(
     neuron_counts,
     ep_1sec,
     [
@@ -529,7 +525,7 @@ plt.show()
 
 ```
 
-Let's convert our tuning curve to a function by nearest-neighbor interpolation, using a simple jax reimplementation of `scipy.interp1d` with `kind='nearest'` and `fill_value='extrapolate'`. We then plug it straight into a GLM as the inverse link function, reusing the exp-GLM's fitted filter rather than refitting.
+Let's convert our tuning curve to a function by nearest-neighbor interpolation, using a simple jax reimplementation of `scipy.interp1d` with `kind="nearest"` and `fill_value="extrapolate"`. We then plug it straight into a GLM as the inverse link function, reusing the exp-GLM's fitted filter rather than refitting.
 
 :::{admonition} Why not use `scipy.interp1d` directly?
 
@@ -564,12 +560,12 @@ np_poisson_glm.scale_ = exp_poisson_glm.scale_
 # Plot exponential and nonparametric nonlinearity estimate
 fig, ax = plt.subplots(1, figsize=(6,4)) 
 x = np.linspace(tc.linpred.values[0], tc.linpred.values[-1], 100)
-ax.plot(x, np.exp(x) * rate_hz, label='exponential f', c=PALETTE[0], lw=2)
-ax.plot(x, nearest_interp(x), label='nonparametric f', c=PALETTE[1], lw=2)
-ax.set_xlabel('filter output')
-ax.set_ylabel('rate (sp/s)')
-ax.legend(loc='upper left')
-ax.set_title('nonlinearity')
+ax.plot(x, np.exp(x) * rate_hz, label="exponential f", c=PALETTE[0], lw=2)
+ax.plot(x, nearest_interp(x), label="nonparametric f", c=PALETTE[1], lw=2)
+ax.set_xlabel("filter output")
+ax.set_ylabel("rate (sp/s)")
+ax.legend(loc="upper left")
+ax.set_title("nonlinearity")
 plt.tight_layout()
 plt.show()
 ```
@@ -596,7 +592,7 @@ The second piece is the baseline: a homogeneous model firing at a constant rate 
 ```{code-cell} ipython3
 mean_rate = np.mean(counts_valid) * np.ones(n_samples)
 ll_null = exp_poisson_glm.observation_model.log_likelihood(counts_valid.d, mean_rate) * n_samples
-print(f'null-model log-likelihood: {float(ll_null):.1f}')
+print(f"null-model log-likelihood: {float(ll_null):.1f}")
 ```
 
 Putting the pieces together, the single-spike information is the per-spike, base-2 difference between each model and the baseline.
@@ -605,15 +601,15 @@ Putting the pieces together, the single-spike information is the per-spike, base
 n_spikes = counts_valid.sum()
 ss_info_exp = float((ll_exp - ll_null) / n_spikes / np.log(2))
 ss_info_np = float((ll_np - ll_null) / n_spikes / np.log(2))
-print('\n empirical single-spike information:\n ---------------------- ')
-print(f'exp-GLM: {ss_info_exp:.2f} bits/sp')
-print(f' np-GLM: {ss_info_np:.2f} bits/sp')
+print("\nempirical single-spike information:\n---------------------- ")
+print(f"exp-GLM: {ss_info_exp:.2f} bits/sp")
+print(f" np-GLM: {ss_info_np:.2f} bits/sp")
 ```
 
 Finally, let's compare the two rate predictions directly.
 
 ```{code-cell} ipython3
-plot_counts_with_predictions(
+plot_counts(
     neuron_counts,
     ep_1sec,
     [
