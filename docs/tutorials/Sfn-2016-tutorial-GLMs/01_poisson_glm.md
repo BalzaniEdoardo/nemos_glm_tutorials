@@ -322,14 +322,14 @@ counts_valid = neuron_counts.restrict(X_valid.time_support)
 # total spike count, following the standard STA definition.
 sta = (X_valid.d.T @ counts_valid.d) / neuron_counts.sum()
 
-lag_times. = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
+lag_times = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for STA (in seconds)
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(lag_times., sta, "o-", color=PALETTE[0])
+plt.plot(lag_times, sta, "o-", color=PALETTE[0])
 plt.title('STA')
 plt.xlabel('time before spike (s)')
-plt.xlim([lag_times.[0],lag_times.[-1]])
+plt.xlim([lag_times[0],lag_times[-1]])
 plt.show()
 ```
 
@@ -356,11 +356,11 @@ wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(lag_times., sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
-plt.plot(lag_times., wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
+plt.plot(lag_times, sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
+plt.plot(lag_times, wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
 plt.title('STA and whitened STA')
 plt.xlabel('time before spike (s)')
-plt.xlim([lag_times.[0],lag_times.[-1]])
+plt.xlim([lag_times[0],lag_times[-1]])
 plt.legend()
 plt.show()
 ```
@@ -486,12 +486,12 @@ rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(lag_times., gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
-ax1.plot(lag_times., exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
+ax1.plot(lag_times, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c=PALETTE[0])
+ax1.plot(lag_times, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c=PALETTE[1])
 ax1.legend(loc = 'upper left')
 ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
 ax1.set_xlabel('time before spike (s)')
-ax1.set_xlim([lag_times.[0], lag_times.[-1]])
+ax1.set_xlim([lag_times[0], lag_times[-1]])
 
 plot_counts_with_predictions(
     neuron_counts,
@@ -580,14 +580,11 @@ How well does each model actually describe the spikes? A natural measure is the 
 
 A raw log-likelihood is hard to read on its own, so we compare it against a baseline that ignores the stimulus and fires at a constant mean rate. The difference between the two log-likelihoods, divided by the number of spikes and converted to base 2, is the **single-spike information**: the bits per spike we gain by knowing the model's rate rather than just the mean rate. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000].
 
-Computing it needs three pieces: the log-likelihood of each fitted GLM, the log-likelihood of the constant-rate baseline, and the total spike count. We'll build them one at a time. Throughout we work on the valid bins only: the early bins of the design matrix are NaN (the convolution had no past to fill them), so we drop them with `dropna` and align the counts to the bins that remain via their shared `time_support`.
+Computing it needs three pieces: the log-likelihood of each fitted GLM, the log-likelihood of the constant-rate baseline, and the total spike count. We'll build them one at a time, working on the valid (non-padded) bins we already prepared earlier, `X_valid` and `counts_valid`.
 
 For the first piece, the fitted GLMs, we use `score`. It returns the *mean* log-likelihood per sample, so we multiply by the number of samples to get the total.
 
 ```{code-cell} ipython3
-# Drop the NaN-padded rows, then align the counts to the bins that remain.
-X_valid = X.dropna()
-counts_valid = neuron_counts.restrict(X_valid.time_support)
 n_samples = counts_valid.shape[0]
 
 ll_exp = exp_poisson_glm.score(X_valid, counts_valid) * n_samples

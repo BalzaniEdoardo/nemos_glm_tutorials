@@ -54,6 +54,7 @@ dev = [
 notebooks = [
     "jupyterlab",
     "jupyterlab-code-formatter",
+    "jupyterlab-myst",             # Render MyST directives (admonitions, etc.) in JupyterLab
     "jupytext",
     "jupyter-collaboration",
     "pandas",
