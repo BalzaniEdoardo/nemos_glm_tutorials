@@ -18,11 +18,9 @@ applied to familiar material.
 
 - **Data Science & Data Skills for Neuroscientists — J.W. Pillow (SfN 2016).** A
   faithful rebuild of Jonathan Pillow's
-  [spike-train GLM short course](https://github.com/pillowlab/GLMspiketraintutorial_python).
-  Starting from retinal ganglion cell recordings, it walks from spike binning and
-  design-matrix construction through the spike-triggered average, linear-Gaussian
-  and Poisson GLMs, a non-parametric nonlinearity, model comparison
-  (log-likelihood and AIC), and simulating spike trains from the fitted model.
+  [spike-train GLM short course](https://github.com/pillowlab/GLMspiketraintutorial_python),
+  reproduced as a series of tutorials on fitting GLMs to retinal ganglion cell
+  spike trains with `pynapple` and `NeMoS`.
 
 ## Installation
 

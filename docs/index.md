@@ -6,7 +6,7 @@ A collection of tutorials showing how to analyse systems-neuroscience datasets w
 
 ### [Data Science & Data Skills for Neuroscientists — J.W. Pillow (SfN 2016)](tutorials/Sfn-2016-tutorial-GLMs/index.md)
 
-A faithful rebuild of Jonathan Pillow's spike-train GLM short course. Starting from retinal ganglion cell recordings, it walks from spike binning and design-matrix construction through the spike-triggered average, linear-Gaussian and Poisson GLMs, a non-parametric nonlinearity, model comparison (log-likelihood and AIC), and simulating spike trains from the fitted model.
+A faithful rebuild of Jonathan Pillow's spike-train GLM short course, reproduced as a series of tutorials on fitting GLMs to retinal ganglion cell spike trains with `pynapple` and `NeMoS`.
 
 ```{toctree}
 :hidden:
