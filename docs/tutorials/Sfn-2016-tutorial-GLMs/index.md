@@ -1,6 +1,6 @@
 # GLM Tutorials
 
-The material proposed in these tutorials revisits what was presented by [Jonathan Pillow](http://pillowlab.princeton.edu) in a "short course" on [Data Science and Data Skills for Neuroscientists](https://neuronline.sfn.org/scientific-research/data-science-and-data-skills-for-neuroscientists#:~:text=Data%20science%20is%20fast%2Dgrowing,be%20used%20in%20different%20circumstances) organized at the SFN 2016 meeting, constructing and fitting models with [`pynapple`](https://pynapple.org/) and [`NeMoS`](https://nemos.readthedocs.io/en/latest/index.html).
+The material proposed in these tutorials revisits what was presented by [Jonathan Pillow](https://pillowlab.princeton.edu) in a "short course" on [Data Science and Data Skills for Neuroscientists](https://neuronline.sfn.org/scientific-research/data-science-and-data-skills-for-neuroscientists) organized at the SFN 2016 meeting, constructing and fitting models with [`pynapple`](https://pynapple.org/) and [`NeMoS`](https://nemos.readthedocs.io/en/latest/index.html).
 
 The original Matlab implementation and its python translation can be found at the following links:
 
@@ -12,7 +12,7 @@ The original Matlab implementation and its python translation can be found at th
 
 
 ```{toctree}
-:maxdepth: 3
+:maxdepth: 2
 
 01_poisson_glm.md
 ```
@@ -24,6 +24,6 @@ The original Matlab implementation and its python translation can be found at th
 ## Citation
 
 If you found this material useful and you wish to cite this tutorial, feel free to :
-- Acknowledge the paper from which it was developed: [Pillow et al, *Nature* 2008](http://pillowlab.princeton.edu/pubs/abs_Pillow08_nature.html)
+- Acknowledge the paper from which it was developed: [Pillow et al, *Nature* 2008](https://pillowlab.princeton.edu/pubs/abs_Pillow08_nature.html)
 - Acknowlege `pynapple` package by citing the [accompanying paper](https://pynapple.org/citing.html). 
-- Acknowledge `NeMoS` package by citing the [asspcoated DOI](https://nemos.readthedocs.io/en/latest/citation.html).
+- Acknowledge `NeMoS` package by citing the [associated DOI](https://nemos.readthedocs.io/en/latest/citation.html).
