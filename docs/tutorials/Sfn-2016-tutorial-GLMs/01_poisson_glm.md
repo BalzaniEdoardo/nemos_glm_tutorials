@@ -414,14 +414,14 @@ print('Training perf (R^2): lin-gauss GLM, w/ offset: {:.2f}'.format(1-mse2/rss)
 
 ## Linear-Gaussian GLM with NeMoS
 
-Fitting a Linear Gaussian GLM with nemos is straightforward, let's see how.
+We just computed the whitened STA by hand, with the least-squares formula. That estimate is the maximum-likelihood filter of a GLM with a Gaussian noise model and an identity link. NeMoS can fit that same model for us, so let's check that the two agree.
 
 ```{code-cell} ipython3
 
 # Define a model object
-model = nmo.glm.GLM(observation_model="Gaussian", solver_name="BFGS")
-model.fit(X, neuron_counts)
-model
+gaussian_glm = nmo.glm.GLM(observation_model="Gaussian", solver_name="BFGS")
+gaussian_glm.fit(X, neuron_counts)
+gaussian_glm
 ```
 
 [//]: # (TODO: drop the solver_name parameter once the Newton PR is done)
@@ -431,7 +431,7 @@ Let's plot the predictions and compare the resulting coefficients with the one o
 
 ```{code-cell} ipython3
 
-sppred_lgGLM_nemos = model.predict(X)
+sppred_lgGLM_nemos = gaussian_glm.predict(X)
 
 plot_counts_with_predictions(
     neuron_counts,
@@ -452,25 +452,24 @@ print('Training perf (R^2): lin-gauss GLM, nemos: {:.2f}'.format(1-mse_nemos/rss
 
 ## Poisson GLM
 
-Fitting a poisson GLM with exponential non-linearity is actually as easy as a linear regression, let's do it.
+The linear-Gaussian model treats spike counts as continuous and lets the prediction go negative, which is not what counts do. The Poisson GLM fixes this: it models the counts as Poisson, and passes the linear prediction through an exponential nonlinearity so the predicted rate is always positive. Fitting it takes the same two lines as before; the only change is the observation model, which is Poisson by default.
 
 ```{code-cell} ipython3
-# Instantiate a Poisson GLM (or change the observation model, `
-# model.observation_model = "Poisson"`)
-poisson_model = nmo.glm.GLM(solver_name="BFGS").fit(X, neuron_counts)
-poisson_model
+# Poisson is the default observation model, so there is nothing to set here.
+exp_poisson_glm = nmo.glm.GLM(solver_name="BFGS").fit(X, neuron_counts)
+exp_poisson_glm
 ```
 
-And computing the predicted rate is more of the same.
+The predicted rate comes from the same `predict` method. Let's compare the two filters and their predictions side by side.
 
 ```{code-cell} ipython3
-rate_pred_pGLM = poisson_model.predict(X)
+rate_pred_pGLM = exp_poisson_glm.predict(X)
 
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(ttk, model.coef_/np.linalg.norm(model.coef_), 'o-', label='lin-gauss GLM filt', c='gold')
-ax1.plot(ttk, poisson_model.coef_/np.linalg.norm(poisson_model.coef_), 'o-', label='poisson GLM filt', c='red')
+ax1.plot(ttk, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), 'o-', label='lin-gauss GLM filt', c='gold')
+ax1.plot(ttk, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), 'o-', label='poisson GLM filt', c='red')
 ax1.legend(loc = 'upper left')
 ax1.set_title('(normalized) linear-Gaussian and Poisson GLM filter estimates')
 ax1.set_xlabel('time before spike (s)')
@@ -502,7 +501,7 @@ A way to estimate the non-linearity from the data is computing the filtered stim
 
 # The filtered stimulus is the GLM's linear predictor: its output *before* the
 # nonlinearity, i.e. X @ coef + intercept.
-raw_filter_output = X @ poisson_model.coef_ + poisson_model.intercept_
+raw_filter_output = X @ exp_poisson_glm.coef_ + exp_poisson_glm.intercept_
 
 # Binning that against the spikes and averaging per bin is exactly a tuning curve.
 tc = nap.compute_tuning_curves(units[cell_idx], raw_filter_output.dropna(), bins=25, feature_names=["linpred"])
@@ -539,10 +538,10 @@ def nearest_interp(x):
 # A Poisson GLM whose nonlinearity *is* the estimated tuning curve. The curve is
 # in spikes/s, so we divide by rate_hz to get the GLM's spikes/bin. We set the
 # link at construction and reuse the exp-GLM's fitted filter instead of refitting.
-np_poisson_model = nmo.glm.GLM(inverse_link_function=lambda x: nearest_interp(x) / rate_hz)
-np_poisson_model.coef_ = poisson_model.coef_
-np_poisson_model.intercept_ = poisson_model.intercept_
-np_poisson_model.scale_ = poisson_model.scale_
+np_poisson_glm = nmo.glm.GLM(inverse_link_function=lambda x: nearest_interp(x) / rate_hz)
+np_poisson_glm.coef_ = exp_poisson_glm.coef_
+np_poisson_glm.intercept_ = exp_poisson_glm.intercept_
+np_poisson_glm.scale_ = exp_poisson_glm.scale_
 
 # Plot exponential and nonparametric nonlinearity estimate
 fig, ax = plt.subplots(1, figsize=(10,4)) 
@@ -559,45 +558,56 @@ plt.show()
 
 ## Quantifying performance: log-likelihood
 
-Lastly, compute log-likelihood for the Poisson GLMs we've used so far and compare performance. The difference of the loglikelihood and homogeneous-Poisson loglikelihood, normalized by the number of spikes, gives us an intuitive way to compare log-likelihoods in units of bits / spike.  This is a quantity known as the (empirical) single-spike information. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000]. You can think of this as the number of bits (number of yes/no questions that we can answer) about the times of spikes when we know the spike rate output by the model, compared to when we only know the (constant) mean spike rate. 
+How well does each model actually describe the spikes? A natural measure is the log-likelihood: how probable the observed counts are under the rates the model predicts.
 
-For the two fitted GLMs we get the log-likelihood from `score`, which evaluates the model's likelihood and drops the NaN-padded samples internally, so we don't have to think about them. The homogeneous (constant-rate) model is not a fitted GLM, so there is no `score` to call: we evaluate the Poisson log-likelihood directly through the observation model. That means we have to drop the invalid samples ourselves — both so `log_likelihood` only sees valid entries, and so the constant rate is the mean over genuine bins rather than being biased by the NaN-padding. That clean-up is exactly what `score` was doing for us for free; here we reproduce it by hand via `valid_counts`.
+A raw log-likelihood is hard to read on its own, so we compare it against a baseline that ignores the stimulus and fires at a constant mean rate. The difference between the two log-likelihoods, divided by the number of spikes and converted to base 2, is the **single-spike information**: the bits per spike we gain by knowing the model's rate rather than just the mean rate. [See Brenner et al, "Synergy in a Neural Code", Neural Comp 2000].
+
+Computing it needs three pieces: the log-likelihood of each fitted GLM, the log-likelihood of the constant-rate baseline, and the total spike count. We'll build them one at a time. Throughout we work on the valid bins only: the early bins of the design matrix are NaN (the convolution had no past to fill them), so we drop them with `dropna` and align the counts to the bins that remain via their shared `time_support`.
+
+For the first piece, the fitted GLMs, we use `score`. It returns the *mean* log-likelihood per sample, so we multiply by the number of samples to get the total.
 
 ```{code-cell} ipython3
+# Drop the NaN-padded rows, then align the counts to the bins that remain.
+X_valid = X.dropna()
+counts_valid = neuron_counts.restrict(X_valid.time_support)
+n_samples = counts_valid.shape[0]
 
-# Total model log-likelihood (the default aggregation, np.mean, would instead
-# give a per-sample likelihood). `score` drops the NaN-padded samples for us.
-ll_exp_pglm = poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
-ll_np_pglm = np_poisson_model.score(X, neuron_counts, aggregate_sample_scores=np.sum)
+ll_exp = exp_poisson_glm.score(X_valid, counts_valid) * n_samples
+ll_np = np_poisson_glm.score(X_valid, counts_valid) * n_samples
+```
 
-# Now the "homogeneous" Poisson model: a constant firing rate equal to the mean
-# spike count. There is no fitted GLM to score here, so we call the observation
-# model directly and drop the NaN-padded bins ourselves, so the mean rate is
-# computed only over valid samples.
-valid_counts = neuron_counts[window_size:].d
-ll0 = poisson_model.observation_model.log_likelihood(
-    valid_counts, 
-    np.mean(valid_counts) * np.ones_like(valid_counts),
-    aggregate_sample_scores=np.sum
-)
+The second piece is the baseline: a homogeneous model firing at a constant rate equal to the mean spike count. It is not a fitted GLM, so there is no `score` to call. The log-likelihood itself, though, lives on the observation model — `log_likelihood(observations, rate)` — and also returns a per-sample mean, so again we multiply by `n_samples`.
 
-ss_info_exp = (ll_exp_pglm - ll0)/valid_counts.sum()/np.log(2)
-ss_info_np = (ll_np_pglm - ll0)/valid_counts.sum()/np.log(2)
+```{code-cell} ipython3
+mean_rate = np.mean(counts_valid) * np.ones(n_samples)
+ll_null = exp_poisson_glm.observation_model.log_likelihood(counts_valid.d, mean_rate) * n_samples
+print(f'null-model log-likelihood: {float(ll_null):.1f}')
+```
+
+Putting the pieces together, the single-spike information is the per-spike, base-2 difference between each model and the baseline.
+
+```{code-cell} ipython3
+n_spikes = counts_valid.sum()
+ss_info_exp = float((ll_exp - ll_null) / n_spikes / np.log(2))
+ss_info_np = float((ll_np - ll_null) / n_spikes / np.log(2))
 print('\n empirical single-spike information:\n ---------------------- ')
 print(f'exp-GLM: {ss_info_exp:.2f} bits/sp')
 print(f' np-GLM: {ss_info_np:.2f} bits/sp')
+```
 
+Finally, let's compare the two rate predictions directly.
+
+```{code-cell} ipython3
 plot_counts_with_predictions(
     neuron_counts,
     ep_1sec,
     [
-        (poisson_model.predict(X), "exp-poisson GLM", "r"),
-        (np_poisson_model.predict(X), "np-poisson GLM", "orange"),
+        (exp_poisson_glm.predict(X), "exp-poisson GLM", "r"),
+        (np_poisson_glm.predict(X), "np-poisson GLM", "orange"),
     ],
     title="rate predictions",
     ylabel="spikes / bin",
 )
 plt.tight_layout()
 plt.show()
-
 ```
