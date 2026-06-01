@@ -475,3 +475,83 @@ print(f"\nAIC favors the '{winner}' model.")
 
 Both metrics agree: the spike-history and coupling terms each add structure the stimulus alone cannot capture — the spike-history filter accounts for the cell's own refractoriness and bursting, while the coupling filters absorb shared variability from the rest of the population — and the improvement in fit more than pays for the extra parameters.
 
+:::{admonition} The whole pipeline, side by side
+:class: tip dropdown
+
+Here is the entire path from the raw `.mat` files to a fitted **coupled GLM**, in both stacks. Same model, same result (the single-spike information and AIC above match the original to the second decimal) — the only difference is how much bookkeeping you write by hand.
+
+**`pynapple` + `NeMoS`:**
+
+```python
+import numpy as np, pynapple as nap, nemos as nmo
+from scipy.io import loadmat
+from nemos_tutorials import fetch_data
+
+paths = fetch_data("data_RGCs")
+
+# load, align, count, resample
+units = nap.TsGroup({i: nap.Ts(v) for i, v in
+                     enumerate(loadmat(paths["SpTimes.mat"], simplify_cells=True)["SpTimes"])})
+stimulus = nap.Tsd(loadmat(paths["stimtimes.mat"], simplify_cells=True)["stimtimes"],
+                   loadmat(paths["Stim.mat"], simplify_cells=True)["Stim"])
+units = units.restrict(stimulus.time_support)
+bin_size = stimulus.t[1] - stimulus.t[0]
+counts = units.count(bin_size, stimulus.time_support)
+stimulus = counts.value_from(stimulus, mode="before")
+
+# design (stim history + every neuron's spike history) and fit
+bas = (nmo.basis.HistoryConv(25, conv_kwargs={"shift": False}, label="stim")
+       + nmo.basis.HistoryConv(20, label="spike"))
+X = bas.compute_features(stimulus, counts)
+model = nmo.glm.GLM(solver_name="BFGS").fit(X, counts[:, 2])
+
+# recover the filters, already shaped and labelled
+filters = bas.split_by_feature(model.coef_, axis=0)
+stim_filter = filters["stim"]    # (25,)
+spk_filters = filters["spike"]   # (4, 20)  -> one row per neuron
+```
+
+**`NumPy` + `statsmodels`** (the original):
+
+```python
+import numpy as np, statsmodels.api as sm
+from scipy.io import loadmat
+from scipy.linalg import hankel
+
+stim = np.squeeze(loadmat("data_RGCs/Stim.mat")["Stim"])
+stim_times = np.squeeze(loadmat("data_RGCs/stimtimes.mat")["stimtimes"])
+spikes = [np.squeeze(x) for x in np.squeeze(loadmat("data_RGCs/SpTimes.mat")["SpTimes"])]
+num_cells, dt, n = len(spikes), stim_times[1] - stim_times[0], stim.size
+cell_idx, ntfilt, nthist = 2, 25, 20
+
+# bin spikes on a grid anchored at zero
+binned = np.stack([np.histogram(s, np.arange(n + 1) * dt)[0] for s in spikes], axis=1)
+y = binned[:, cell_idx]
+
+# stimulus design via hankel (manual zero-padding)
+padded_stim = np.hstack((np.zeros(ntfilt - 1), stim))
+Xstim = hankel(padded_stim[:-ntfilt + 1], stim[-ntfilt:])
+
+# spike-history design for every neuron, shifted one bin back so a bin can't predict itself
+Xspk = np.zeros((n, nthist, num_cells))
+for j in range(num_cells):
+    padded = np.hstack((np.zeros(nthist), binned[:-1, j]))
+    Xspk[:, :, j] = hankel(padded[:-nthist + 1], padded[-nthist:])
+Xspk = Xspk.reshape(n, -1, order="F")
+
+# concatenate, add an intercept column, fit
+X = np.hstack((np.ones((n, 1)), Xstim, Xspk))
+model = sm.GLM(y, X, family=sm.families.Poisson()).fit(max_iter=100, tol=1e-6, tol_criterion="params")
+
+# recover the filters by hand: slice past the intercept, and un-flatten the
+# coupling block with the same order="F" used to build it (then transpose)
+params = model.params
+stim_filter = params[1:ntfilt + 1]                                         # (25,)
+spk_filters = params[ntfilt + 1:].reshape(nthist, num_cells, order="F").T  # (4, 20)
+```
+
+The `pynapple` + `NeMoS` version is roughly half the lines — and that is *despite* the `NumPy` side being written in its most compressed form. But the line count is the least of it: even compressed, the `NumPy` version is dense with fragile indexing (`[:-ntfilt+1]`, the `[:-1]` one-bin shift, `order="F"`, the intercept slice), while the `pynapple` + `NeMoS` version reads as plain intent. The alignment and the design structure are handled for you, so there is far less surface area for a silent off-by-one.
+
+You can see the same split at the bottom of each listing: recovering the stimulus and spike-history filters is one `split_by_feature` call keyed by basis label here, versus slicing past the intercept and un-flattening the coupling block with `order="F"` (plus a transpose) by hand. Both reach the same `(25,)` and `(4, 20)` filters — but every index in the manual version is a chance to be quietly wrong.
+:::
+
