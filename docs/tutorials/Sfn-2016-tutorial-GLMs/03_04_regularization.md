@@ -432,6 +432,33 @@ additive = (
     nmo.basis.HistoryConv(window_size_stim, label="stim")
 )
 X_multi = additive.compute_features(stimulus, neuron_counts)
+
+# Reverse the columns to match other plots
+split_coupling = additive.split_by_feature(X_multi, axis=1)
+n_samples = X_multi.shape[0]
+X_multi = np.hstack(
+    [Xi[..., ::-1].reshape((n_samples, -1)) for Xi in split_coupling.values()]
+)
 reg_multi = L2Smoothing(lambda x: additive.split_by_feature(x, axis=0))
-model = nmo.glm.GLM(regularizer=reg_multi).fit(X_multi.restrict(train_ep), neuron_counts.restrict(train_ep))
+model = nmo.glm.GLM(regularizer=reg_multi)
+model.fit(
+    X_multi.restrict(train_ep), 
+    neuron_counts.restrict(train_ep)
+)
+```
+
+The same `split_by_feature` we passed to the regularizer also lets us pull the two filters back out of the fitted coefficients and plot each one — smoothed within itself, never across the seam.
+
+```{code-cell} ipython3
+filters = additive.split_by_feature(model.coef_, axis=0)
+
+fig, axs = plt.subplots(1, len(filters), figsize=[12, 4])
+for ax, (label, filt) in zip(axs, filters.items()):
+    filt = np.asarray(filt).squeeze()
+    lag = np.arange(-filt.shape[0] + 1, 1) * bin_size
+    ax.plot(lag, filt, linewidth=2)
+    ax.set_title(f"{label} filter")
+    ax.set_xlabel("time before spike (s)")
+fig.tight_layout()
+plt.show()
 ```
