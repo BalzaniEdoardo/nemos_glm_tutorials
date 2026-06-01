@@ -261,7 +261,6 @@ def cross_val_model(
     test_scores = np.zeros((n_lambdas, ))
     train_scores = np.zeros((n_lambdas, ))
     for i, l in enumerate(lambdas):
-        print(f"Fit {i} - reg strength {l}")
         model = nmo.glm.GLM(
             observation_model=observation_model, 
             solver_name="BFGS",
@@ -377,11 +376,11 @@ class L2Smoothing(Regularizer):
     # solver used by default
     _default_solver = "BFGS"
 
-    def __init__(self, split_fn):
+    def __init__(self, split_fn=None):
         # splits the coefficients per predictor so we never smooth across
         # filters; think of it as `basis.split_by_feature`
-        self.split_fn = split_fn
-
+        self.split_fn = split_fn if split_fn is not None else lambda x: x
+    
     @staticmethod
     def smoothness_penalty(coef):
         """Sum of squared differences between adjacent coefficients.
@@ -407,7 +406,7 @@ Now let's try our new fancy regularizer.
 
 ```{code-cell} ipython3
 
-reg = L2Smoothing(lambda x: bas.split_by_feature(x, axis=0))
+reg = L2Smoothing()
 
 coefs, intercepts, train_scores, test_scores = cross_val_model(
     lambda_grid, 
