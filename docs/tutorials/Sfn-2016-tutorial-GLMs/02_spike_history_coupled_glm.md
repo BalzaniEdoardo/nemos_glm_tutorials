@@ -31,13 +31,12 @@ For more details on the `pynapple` objects and a step-by-step walkthrough of the
 
 ```{code-cell} ipython3
 
-import maplotlib.pyplot as plt
-from nemos_tutorials import fetch_data
+import matplotlib.pyplot as plt
+import numpy as np
+from nemos_tutorials import fetch_data, PALETTE, plot_counts
 import pynapple as nap
 import jax
 from scipy.io import loadmat
-
-PALETTE = plt.cm.Pastel1.colors
 
 # enable float64 for precision
 jax.config.update("jax_enable_x64", True)
@@ -87,10 +86,8 @@ As you can see, the CCGs are stored in a pandas dataframe. Each column represent
 
 ```{code-cell} ipython3
 
-import matplotlib.pyplot as plt
-
 fig = plt.figure(figsize=[12,8])
-for i in acg.columns:
+for i in acgs.columns:
     plt.subplot(len(units), len(units), i*len(units) + i + 1)
     plt.title(f'cells ({i},{i})')
     plt.plot(acgs[i])
@@ -237,10 +234,32 @@ ax1.set_xlabel('time before spike (s)')
 ax1.set_ylabel('weight')
 plt.tight_layout()
 plt.show()
+```
 
-## TODO FOR CLAUDE: add the plotting of the rate + count 
-## INSTRUCTUION: Move the plotting function from tutorial 01 to src/nemos_tutorials/plotting.py 
-## creating the script. Use that function here too.
+Adding the spike history sharpens the prediction. Let's look at the predicted rate of both models against the observed spike counts. We reuse the `plot_counts` helper from the [first tutorial](tutorial-01), now shared via the `nemos_tutorials` package.
+
+```{code-cell} ipython3
+# Stimulus-only model is fit on the stim sub-block of the design matrix.
+X_stim = bas.split_by_feature(X, axis=1)["stim"]
+
+rate_stim_only = model_stim_only.predict(X_stim)
+rate_stim_spk = model_stim_spk.predict(X)
+
+# Pick a 1-second window starting after the NaN-padded history bins.
+t0 = rate_stim_spk.dropna().t[0]
+ep = (t0, t0 + 1)
+
+plot_counts(
+    neuron_counts,
+    ep,
+    [
+        (rate_stim_only, "stim only"),
+        (rate_stim_spk, "stim + spike hist"),
+    ],
+    title="single-neuron GLM: rate prediction",
+    ylabel="spikes / bin",
+)
+plt.show()
 ```
 
 # Fit coupled GLM for multiple-neuron responses
@@ -250,18 +269,23 @@ Instead of using the spike history of the fitted neuron only (auto-correlation f
 - If `x` is 1D, then `basis.compute_features(x)` will return a $(\text{n_samples}, \text{n_basis_funcs})$ array.
 - If `x` is ND with shape $(\text{n_samples}, i_1,...,i_{n-1})$, then the output will have shape $(\text{n_samples}, i_1 \cdot \dots \cdot i_{n-1} \cdot \text{n_basis_funcs})$.
 
-Therefore, including all counts as predictors follows exactly the same syntax as the single count array case. The only caveat is that we need to re-create the basis otherwise the bookkeeping of the original basis that keeps track of the coefficient structure will be overridden. 
-
-TODO CLAUDE: explain this better (every call of compute features extract teh input shape and uses it for bookkeeping, therefore if we re-use the `bas`, we won't be able to split the original model coefficients.)
+Therefore, including all counts as predictors follows exactly the same syntax as the single count array case. The only caveat concerns the basis bookkeeping: we build the coupled design from a freshly constructed basis, `bas_coupling`, leaving the single-neuron `bas` untouched.
 
 ```{code-cell} ipython3
 
-# Let's re-create the basis 
+# Let's re-create the basis (see admonition below for why)
 bas_coupling = bas_stim + bas_spk
 
 X_coupling = bas_coupling.compute_features(stimulus, counts)
 X_coupling
 ```
+
+:::{admonition} Why are we re-defining the basis?
+:class: note
+:class: dropdown
+
+Every call to `compute_features` inspects the shape of its inputs and stores it on the basis, so that a later `split_by_feature` knows how to carve the design matrix (or the coefficient vector) back into per-feature blocks of the right shape. This stored shape is *overwritten* on each call. If we reused the same `bas` object to build the coupled design, its `spike` block would be reshaped for 4 neurons, and we would no longer be able to split the *single-neuron* model's coefficients with it. Building the coupled design from a fresh `bas_coupling` keeps both models' bookkeeping intact.
+:::
 
 Now the number of columns is 105 = 25 + 20 * 4, where 4 is the number of units.
 
@@ -333,15 +357,64 @@ ax1.set_ylabel('weight')
 plt.tight_layout()
 
 plt.show()
-
-
-
-## TODO FOR CLAUDE: add the plotting of the rate + count 
-## INSTRUCTUION: Move the plotting function from tutorial 01 to src/nemos_tutorials/plotting.py 
-## creating the script. Use that function here too.
-
 ```
 
+And, as before, let's compare the predicted rates of all three models on the same window we used above.
 
-# TODO FOR CLAUDE: add the AIC session.
+```{code-cell} ipython3
+rate_coupled = model_coupled.predict(X_coupling)
+
+plot_counts(
+    neuron_counts,
+    ep,
+    [
+        (rate_stim_only, "stim only"),
+        (rate_stim_spk, "stim + spike hist"),
+        (rate_coupled, "stim + coupling"),
+    ],
+    title="coupled GLM: rate prediction",
+    ylabel="spikes / bin",
+)
+plt.show()
+```
+
+## Comparing the models with AIC
+
+The filters and rate traces show that each added predictor changes the fit, but a richer model can always match the training data a little better simply by having more parameters. To compare the three models fairly we need a criterion that charges for that extra flexibility. As in the [first tutorial](tutorial-01), we use the Akaike Information Criterion,
+
+$$
+\text{AIC} = -2\,\log\text{-likelihood} + 2k,
+$$
+
+where $k$ is the number of free parameters and lower is better.
+
+Since we compute the same quantity for three models, let's wrap it in a small helper. It scores the model on a design matrix (`score` returns the *mean* log-likelihood per sample, so we multiply by the number of samples for the total), reads the free-parameter count straight off the fitted model — filter weights plus intercept — and combines them into the AIC.
+
+We also evaluate every model on the same set of valid bins. The convolution pads the start of each design with NaNs, so rather than hardcoding the window length we let the data tell us which bins are valid: `dropna` on a design returns its non-NaN time support. All three designs share the same padding (the stimulus history is the longest window), so any of them defines the common `valid_epochs`.
+
+```{code-cell} ipython3
+def compute_aic(model, X, y):
+    """AIC = -2 * total log-likelihood + 2 * (number of free parameters)."""
+    ll = model.score(X, y) * y.shape[0]            # score is the per-sample mean
+    n_params = model.coef_.size + model.intercept_.size
+    return float(-2 * ll + 2 * n_params)
+
+# Align every design and the counts to the bins the convolution left valid.
+valid_epochs = X.dropna().time_support
+counts_valid = neuron_counts.restrict(valid_epochs)
+
+aics = {
+    "stim only": compute_aic(model_stim_only, X_stim.restrict(valid_epochs), counts_valid),
+    "stim + spike hist": compute_aic(model_stim_spk, X.restrict(valid_epochs), counts_valid),
+    "stim + coupling": compute_aic(model_coupled, X_coupling.restrict(valid_epochs), counts_valid),
+}
+
+for name, aic in aics.items():
+    print(f"AIC  {name:<18}: {aic:.1f}")
+
+winner = min(aics, key=aics.get)
+print(f"\nAIC favors the '{winner}' model.")
+```
+
+A lower AIC means the gain in log-likelihood more than pays for the extra parameters. The spike-history and coupling terms each add structure that the stimulus alone cannot capture — the spike-history filter accounts for the cell's own refractoriness and bursting, while the coupling filters absorb shared variability from the rest of the population — so even after the parameter penalty they improve the score.
 
