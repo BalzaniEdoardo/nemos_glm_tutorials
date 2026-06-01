@@ -15,6 +15,7 @@ The original Matlab implementation and its python translation can be found at th
 :maxdepth: 2
 
 01_poisson_glm.md
+02_spike_history_coupled_glm.md
 ```
 
 ## What's changed

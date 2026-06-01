@@ -387,25 +387,9 @@ plot_counts(
 plt.show()
 ```
 
-## Comparing the models with AIC
+## Comparing the models
 
-The filters and rate traces show that each added predictor changes the fit, but a richer model can always match the training data a little better simply by having more parameters. To compare the three models fairly we need a criterion that charges for that extra flexibility. As in the [first tutorial](tutorial-01), we use the Akaike Information Criterion,
-
-$$
-\text{AIC} = -2\,\log\text{-likelihood} + 2k,
-$$
-
-where $k$ is the number of free parameters and lower is better.
-
-Since we compute the same quantity for three models, let's wrap it in a small helper. It scores the model (`score` returns the *mean* log-likelihood per sample, so we multiply by the number of samples to get the total), reads the number of free parameters off the fitted model (the filter weights plus the intercept), and combines the two into the AIC.
-
-```{code-cell} ipython3
-def compute_aic(model, X, y):
-    """AIC = -2 * total log-likelihood + 2 * (number of free parameters)."""
-    ll = model.score(X, y) * y.shape[0]            # score is the per-sample mean
-    n_params = model.coef_.size + model.intercept_.size
-    return float(-2 * ll + 2 * n_params)
-```
+The filters and rate traces show that each added predictor changes the fit, but how much do we actually gain? Let's quantify it with two complementary metrics: the **single-spike information** (how many bits per spike the model buys us over a constant-rate baseline) and the **AIC** (which rewards fit but charges for extra parameters). Both build on the same quantity — the total log-likelihood of each fitted model — so let's compute that first.
 
 One thing to be careful about: the convolution pads the start of each design with NaNs. Rather than hardcoding the window length, let's let the data tell us which bins are valid. Calling `dropna` on a design returns its non-NaN time support, and since all three designs share the same padding (the stimulus history is the longest window), any of them defines the common `valid_epochs`.
 
@@ -413,15 +397,73 @@ One thing to be careful about: the convolution pads the start of each design wit
 valid_epochs = X.dropna().time_support
 ```
 
-Now we can restrict all the time series to `valid_epochs` and compute the AIC safely.
+Now we can restrict all the time series to `valid_epochs` and evaluate each model on the same bins. We keep the `(model, design)` pair for each fit in a dict, since we'll reuse both below.
 
 ```{code-cell} ipython3
 counts_valid = neuron_counts.restrict(valid_epochs)
 
+# (model, design matrix) for each of the three fits
+fits = {
+    "stim only": (model_stim_only, X_stim.restrict(valid_epochs)),
+    "stim + spike hist": (model_stim_spk, X.restrict(valid_epochs)),
+    "stim + coupling": (model_coupled, X_coupling.restrict(valid_epochs)),
+}
+```
+
+By default, `score` returns the *mean* log-likelihood per sample. Here we want the total, so we pass `aggregate_sample_scores=np.sum` to sum the per-sample scores instead of averaging them.
+
+
+```{code-cell} ipython3
+log_likelihood = {
+    name: model.score(design, counts_valid, aggregate_sample_scores=np.sum)
+    for name, (model, design) in fits.items()
+}
+```
+
+### Single-spike information
+
+A raw log-likelihood is hard to read on its own, so we compare each model against a baseline that ignores everything and just fires at the constant mean rate. The difference between the two log-likelihoods, divided by the number of spikes and converted to base 2, is the **single-spike information**: the bits per spike we gain by knowing the model's rate rather than the mean rate ([Brenner et al., "Synergy in a Neural Code", Neural Comp 2000](https://www.princeton.edu/~wbialek/our_papers/brenner+al_00b.pdf)).
+
+The baseline is a homogeneous Poisson model firing at the mean spike count. It is not a fitted GLM, so we evaluate its log-likelihood directly on the observation model.
+
+```{code-cell} ipython3
+n_samples = counts_valid.shape[0]
+n_spikes = counts_valid.sum()
+
+# Homogeneous Poisson baseline: constant rate = mean spike count.
+mean_rate = np.mean(counts_valid) * np.ones(n_samples)
+ll_null = model_stim_spk.observation_model.log_likelihood(
+    counts_valid.d, 
+    mean_rate,
+    aggregate_sample_scores=np.sum
+)
+
+print("empirical single-spike information:\n-----------------------------------")
+for name, ll in log_likelihood.items():
+    ss_info = float((ll - ll_null) / n_spikes / np.log(2))
+    print(f"{name:<18}: {ss_info:.2f} bits/sp")
+```
+
+Each added filter buys a bit more information per spike, with the biggest jump coming from the spike history.
+
+### AIC
+
+Single-spike information rewards a model for fitting the spikes but says nothing about how many parameters that fit cost. The Akaike Information Criterion charges for complexity,
+
+$$
+\text{AIC} = -2\,\log\text{-likelihood} + 2k,
+$$
+
+where $k$ is the number of free parameters and lower is better. We read $k$ straight off each fitted model: its filter weights plus the intercept.
+
+```{code-cell} ipython3
+def count_pars(model):
+    """Number of free parameters: filter weights plus intercept."""
+    return model.coef_.size + model.intercept_.size
+
 aics = {
-    "stim only": compute_aic(model_stim_only, X_stim.restrict(valid_epochs), counts_valid),
-    "stim + spike hist": compute_aic(model_stim_spk, X.restrict(valid_epochs), counts_valid),
-    "stim + coupling": compute_aic(model_coupled, X_coupling.restrict(valid_epochs), counts_valid),
+    name: float(-2 * log_likelihood[name] + 2 * count_pars(model))
+    for name, (model, _) in fits.items()
 }
 
 for name, aic in aics.items():
@@ -431,5 +473,5 @@ winner = min(aics, key=aics.get)
 print(f"\nAIC favors the '{winner}' model.")
 ```
 
-A lower AIC means the gain in log-likelihood more than pays for the extra parameters. The spike-history and coupling terms each add structure that the stimulus alone cannot capture — the spike-history filter accounts for the cell's own refractoriness and bursting, while the coupling filters absorb shared variability from the rest of the population — so even after the parameter penalty they improve the score.
+Both metrics agree: the spike-history and coupling terms each add structure the stimulus alone cannot capture — the spike-history filter accounts for the cell's own refractoriness and bursting, while the coupling filters absorb shared variability from the rest of the population — and the improvement in fit more than pays for the extra parameters.
 
