@@ -79,7 +79,8 @@ acgs = nap.compute_autocorrelogram(units, binsize=bin_size, windowsize=window_si
 # drop acgs at t=0 
 acgs.loc[0] = np.nan
 
-ccgs
+# plot the first 10 rows
+ccgs.iloc[:10]
 ```
 
 As you can see, the CCGs are stored in a pandas dataframe. Each column represents a pair of units, with the column name indicating the pair. Let's plot them.
