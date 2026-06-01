@@ -13,6 +13,11 @@ kernelspec:
 
 # Tutorial 3+4 - Gaussian and Poisson GLM with Regularization
 
+:::{admonition} Run this tutorial yourself
+:class: tip
+
+Download this page as a {download}`Jupyter notebook (.ipynb) <./03_04_regularization.ipynb>` and run it locally.
+:::
 
 This tutorial adapts and combines two notebooks from JW Pillow's material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting:
 
