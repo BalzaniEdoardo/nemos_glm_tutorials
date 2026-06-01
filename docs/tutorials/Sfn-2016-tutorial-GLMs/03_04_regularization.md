@@ -321,14 +321,14 @@ plot_cv_results(
 The Poisson GLM is more of the same: we reuse the exact same `cross_val_model`, only switching the observation model from `"Gaussian"` to `"Poisson"`.
 
 ```{code-cell} ipython3
-coefs, intercepts, train_scores, test_scores = cross_val_model(
+coefs_ridge, _, train_ridge, test_ridge = cross_val_model(
     lambda_grid, 
     X, neuron_counts, train_ep, test_ep, 
     regularizer="Ridge",
     observation_model="Poisson"
 )
 
-plot_cv_results(lambda_grid, coefs, train_scores, test_scores, lags, title="Poisson GLM")
+plot_cv_results(lambda_grid, coefs_ridge, train_ridge, test_ridge, lags, title="Poisson GLM")
 ```
 
 ## NeMoS advanced: L2-smoothing
@@ -425,7 +425,7 @@ With a single predictor the default (no split) is all we need, so we can drop it
 
 reg = L2Smoothing()
 
-coefs, intercepts, train_scores, test_scores = cross_val_model(
+coefs_smooth, _, train_smooth, test_smooth = cross_val_model(
     lambda_grid, 
     X, neuron_counts, train_ep, test_ep, 
     regularizer=reg,
@@ -433,8 +433,28 @@ coefs, intercepts, train_scores, test_scores = cross_val_model(
 )
 
 plot_cv_results(
-    lambda_grid, coefs, train_scores, test_scores, lags, title="Poisson GLM (L2 smoothing)"
+    lambda_grid, coefs_smooth, train_smooth, test_smooth, lags, title="Poisson GLM (L2 smoothing)"
 )
+```
+
+How do the two penalties compare head to head? Let's pick the best filter under each (the one maximizing test log-likelihood), overlay them, and report their scores.
+
+```{code-cell} ipython3
+best_ridge = coefs_ridge[np.argmax(test_ridge)]
+best_smooth = coefs_smooth[np.argmax(test_smooth)]
+
+print(f"Best ridge     test LL: {np.max(test_ridge):.5f}")
+print(f"Best smoothing test LL: {np.max(test_smooth):.5f}")
+
+plt.figure(figsize=[8, 5])
+plt.axhline(0, color="k", linestyle="--", linewidth=1)
+plt.plot(lags, best_ridge, linewidth=3, label="ridge")
+plt.plot(lags, best_smooth, linewidth=3, label="L2 smoothing")
+plt.title("Best filters by test log-likelihood (Poisson GLM)")
+plt.xlabel("time before spike (s)")
+plt.ylabel("coefficient")
+plt.legend()
+plt.show()
 ```
 
 ### Extra: multiple regressors
