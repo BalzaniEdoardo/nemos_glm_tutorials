@@ -18,7 +18,7 @@ This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMsp
 
  This is an interactive tutorial designed to walk you through the steps of fitting an autoregressive Poisson GLM (i.e., a spiking GLM with spike-history) and a multivariate autoregressive Poisson GLM (i.e., a GLM with spike-history AND coupling between neurons).
 
- (Data from [Uzzell & Chichilnisky, 2004](http://jn.physiology.org/content/92/2/780.long); see `README.txt` file in the `/data_RGCs` directory for details).
+ (Data from [Uzzell & Chichilnisky, 2004](https://pubmed.ncbi.nlm.nih.gov/15277596/); see `README.txt` file in the `/data_RGCs` directory for details).
 The dataset can be downloaded [here](https://pillowlab.princeton.edu/data/data_RGCs.zip):
 
 The dataset is provided for tutorial purposes only, and should not be distributed or used for publication without express permission from EJ Chichilnisky (ej@stanford.edu).
@@ -263,7 +263,7 @@ plot_counts(
 plt.show()
 ```
 
-# Fit coupled GLM for multiple-neuron responses
+## Fit coupled GLM for multiple-neuron responses
 
 Instead of using the spike history of the fitted neuron only (auto-correlation filter), we will learn the functional connectivity by including the spike history of all the other neurons. In NeMoS this is trivial, since every basis is applied in a vectorized way over any extra axis:
 
