@@ -11,6 +11,7 @@ kernelspec:
   display_name: Python 3 (ipykernel)
 ---
 
+(tutorial-01)=
 # Tutorial 1 - Poisson GLM
 
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
@@ -249,6 +250,7 @@ stimulus
 
 And that's it: `counts` and `stimulus` are now aligned to the same interval, sampled on the same bins, and ready for GLM modeling.
 
+(design-matrix-tutorial-01)=
 ## Building the design matrix
 
 Now it's time to build the design matrix for our model. The predictor we want is the recent stimulus history over a fixed window of $w$ samples: to predict the spike count $y_t$ at time $t$, we use the stimulus values $s_{t-1},\dots, s_{t-w}$ that precede it.
@@ -266,7 +268,7 @@ $$ (eq-design-matrix)
 
 Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, because we need at least $w$ stimulus values to fill a row. 2) Each row is a shifted copy of the row above.
 
-A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix and then reverse the column order. In `NeMoS`, convolution with the identity is exactly what the `HistoryConv` basis does.
+A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix and then reverse the column order. In `NeMoS`, convolution with the identity is exactly what the [`HistoryConv`](https://nemos.readthedocs.io/en/latest/generated/basis/nemos.basis.HistoryConv.html) basis does.
 
 ```{code-cell} ipython3
 import nemos as nmo
