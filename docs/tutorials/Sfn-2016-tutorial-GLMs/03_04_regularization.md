@@ -498,3 +498,29 @@ for ax, (label, filt) in zip(axs, filters.items()):
 fig.tight_layout()
 plt.show()
 ```
+## Regularizers shipped with NeMoS
+
+We built `L2Smoothing` by hand because NeMoS doesn't ship it, but several common regularizers come built in. As of NeMoS **v0.2.7** you can pass any of the following as `regularizer=` (by name, e.g. `"Ridge"`, or as an instance):
+
+:::{list-table}
+:header-rows: 1
+:widths: 18 28 54
+
+* - Regularizer
+  - Penalty
+  - What it does
+* - `Ridge`
+  - $\tfrac{\alpha}{2}\lVert w\rVert_2^2$
+  - L2 shrinkage toward zero (MAP under an i.i.d. Gaussian prior); the workhorse used above.
+* - `Lasso`
+  - $\alpha\lVert w\rVert_1$
+  - L1 penalty; promotes sparsity, driving some coefficients exactly to zero.
+* - `ElasticNet`
+  - $\alpha\big(\rho\lVert w\rVert_1 + \tfrac{1-\rho}{2}\lVert w\rVert_2^2\big)$
+  - Convex mix of L1 and L2 — sparsity with the grouped shrinkage of ridge.
+* - `GroupLasso`
+  - $\alpha\sum_g \lVert w_g\rVert_2$
+  - L1 across predefined groups of coefficients; selects or zeros out whole groups (e.g. all weights of one feature) at once.
+:::
+
+In every case the intercept is left unpenalized, and the strength is set through `regularizer_strength` (the $\alpha$ above). For anything not on this list — like our smoothing penalty — you subclass `Regularizer`, exactly as we did.
