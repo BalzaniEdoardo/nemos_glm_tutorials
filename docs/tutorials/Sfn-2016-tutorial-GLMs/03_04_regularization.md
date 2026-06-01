@@ -20,7 +20,7 @@ This tutorial is adapts and combines two notebooks from JW Pillow's material, pr
 - [tutorial4_regularization_PoissonGLM.ipynb](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial4_regularization_PoissonGLM.ipynb).
 
 
- This is an interactive tutorial designed to walk you through the steps of fitting an autoregressive Poisson GLM (i.e., a spiking GLM with spike-history) and a multivariate autoregressive Poisson GLM (i.e., a GLM with spike-history AND coupling between neurons).
+ This is an interactive tutorial designed to walk you through how to fit a GLM controlling for under/overfitting via regularization and cross-validation. In particular, we will illustrate two forms of regularization: ridge and laplacian smoothing.
 
  (Data from [Uzzell & Chichilnisky, 2004](https://pubmed.ncbi.nlm.nih.gov/15277596/); see `README.txt` file in the `/data_RGCs` directory for details).
 The dataset can be downloaded [here](https://pillowlab.princeton.edu/data/data_RGCs.zip):
