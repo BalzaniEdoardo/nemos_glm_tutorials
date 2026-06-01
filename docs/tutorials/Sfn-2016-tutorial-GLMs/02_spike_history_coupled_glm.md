@@ -550,8 +550,12 @@ stim_filter = params[1:ntfilt + 1]                                         # (25
 spk_filters = params[ntfilt + 1:].reshape(nthist, num_cells, order="F").T  # (4, 20)
 ```
 
-The `pynapple` + `NeMoS` version is roughly half the lines — and that is *despite* the `NumPy` side being written in its most compressed form. But the line count is the least of it: even compressed, the `NumPy` version is dense with fragile indexing (`[:-ntfilt+1]`, the `[:-1]` one-bin shift, `order="F"`, the intercept slice), while the `pynapple` + `NeMoS` version reads as plain intent. The alignment and the design structure are handled for you, so there is far less surface area for a silent off-by-one.
+The `pynapple` + `NeMoS` version is roughly half the lines — and that is *despite* the `NumPy` side being written in its most compressed form. But the line count is the least of it. The manual indexing (`[:-ntfilt+1]`, the `[:-1]` one-bin shift, `order="F"`, the intercept slice) is bookkeeping you have to carry by hand, and it only gets harder — both to write correctly and to read — as the model design grows more complex. The `pynapple` + `NeMoS` version avoids it entirely, which pays off in three ways:
 
-You can see the same split at the bottom of each listing: recovering the stimulus and spike-history filters is one `split_by_feature` call keyed by basis label here, versus slicing past the intercept and un-flattening the coupling block with `order="F"` (plus a transpose) by hand. Both reach the same `(25,)` and `(4, 20)` filters — but every index in the manual version is a chance to be quietly wrong.
+1. **Readability.** Each line is practically self-documenting. Handed to a collaborator, `units.count(bin_size)` needs no explanation, whereas `hankel(padded[:-nthist+1], padded[-nthist:])` needs a paragraph.
+
+2. **Generalization.** The same syntax scales with the problem. `compute_features` builds the design matrix identically for one predictor or many; the `pynapple` preprocessing is the same for a single signal or a whole population; the GLM call is unchanged across model configurations. 
+
+3. **Fewer opportunities for bugs.** There are no hand-written indices to get wrong, and index arithmetic is notoriously prone to off-by-one mistakes — the kind that don't raise an error, they just quietly shift your filter by a bin.
 :::
 
