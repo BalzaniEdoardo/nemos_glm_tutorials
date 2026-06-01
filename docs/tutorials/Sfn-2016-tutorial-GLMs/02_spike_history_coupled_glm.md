@@ -25,7 +25,7 @@ The dataset is provided for tutorial purposes only, and should not be distribute
 
 ## Load and pre-process the data
 
-Below a quick data wrangling with `pynapple` that loads, and temporally align the time series. The final result will be a [`TsGroup`](https://pynapple.org/generated/pynapple.TsGroup.html) that contains the spike times from 4 RGCs units, the corresponding spike counts as a [`TsdFrame`](https://pynapple.org/generated/pynapple.TsFrame.html) and a [`Tsd`](https://pynapple.org/generated/pynapple.Tsd.html) with the stimulus. 
+Below is a quick bit of data wrangling with `pynapple` that loads and temporally aligns the time series. The final result will be a [`TsGroup`](https://pynapple.org/generated/pynapple.TsGroup.html) that contains the spike times from 4 RGC units, the corresponding spike counts as a [`TsdFrame`](https://pynapple.org/generated/pynapple.TsFrame.html), and a [`Tsd`](https://pynapple.org/generated/pynapple.Tsd.html) with the stimulus. 
 
 For more details on the `pynapple` objects and a step-by-step walkthrough of the pre-processing, see the [first tutorial](tutorial-01).
 
@@ -66,7 +66,7 @@ stimulus = counts.value_from(stimulus, mode="before")
 
 ## Compute and plot the cross-correlogram
 
-As a first step, let's take a look at the cross-correlograms (CCGs), and let's compute them via the `pynappple` functions [`compute_crosscorrelogram`](https://pynapple.org/generated/pynapple.process.correlograms.html#pynapple.process.correlograms.compute_crosscorrelogram) and [`compute_autocorrelogram`](https://pynapple.org/generated/pynapple.process.correlograms.html#pynapple.process.correlograms.compute_autocorrelogram)..
+As a first step, let's take a look at the cross-correlograms (CCGs), and let's compute them via the `pynapple` functions [`compute_crosscorrelogram`](https://pynapple.org/generated/pynapple.process.correlograms.html#pynapple.process.correlograms.compute_crosscorrelogram) and [`compute_autocorrelogram`](https://pynapple.org/generated/pynapple.process.correlograms.html#pynapple.process.correlograms.compute_autocorrelogram).
 
 ```{code-cell} ipython3
 
@@ -82,7 +82,7 @@ acgs.loc[0] = np.nan
 ccgs
 ```
 
-As you can see, the CCGs are stored in a pandas dataframe. Each column represent a pair of units, with the column name indicate the paris. Let's plot them.
+As you can see, the CCGs are stored in a pandas dataframe. Each column represents a pair of units, with the column name indicating the pair. Let's plot them.
 
 ```{code-cell} ipython3
 
@@ -203,6 +203,7 @@ plt.show()
 Now we are ready to fit our Poisson GLM. Let's fit two models: a model that uses the stimulus as predictor, and one that uses both the stimulus and the spike history.
 
 We can take advantage of the basis bookkeeping again to split the design matrix.
+
 ```{code-cell} ipython3
 
 model_stim_only = nmo.glm.GLM(solver_name="BFGS")
@@ -264,7 +265,7 @@ plt.show()
 
 # Fit coupled GLM for multiple-neuron responses
 
-Instead of using the spike history of the fitted neuron only (auto-correlation filter), we will learn the functional connectivity by including the spike history of all the other neurons. In nemos this is trivial, since every basis is applied in a vectorized way over any extra axis:
+Instead of using the spike history of the fitted neuron only (auto-correlation filter), we will learn the functional connectivity by including the spike history of all the other neurons. In NeMoS this is trivial, since every basis is applied in a vectorized way over any extra axis:
 
 - If `x` is 1D, then `basis.compute_features(x)` will return a $(\text{n_samples}, \text{n_basis_funcs})$ array.
 - If `x` is ND with shape $(\text{n_samples}, i_1,...,i_{n-1})$, then the output will have shape $(\text{n_samples}, i_1 \cdot \dots \cdot i_{n-1} \cdot \text{n_basis_funcs})$.
@@ -297,7 +298,7 @@ split_coupling = bas_coupling.split_by_feature(X_coupling, axis=1)
 print("Keys:", split_coupling.keys())
 ```
 
-But this time, the `stim` component of teh design matrix is conveniently reshaped as `(n_samples,n_neurons, n_basis_funcs)`.
+But this time, the `spike` component of the design matrix is conveniently reshaped as `(n_samples, n_neurons, n_basis_funcs)`, one spike-history block per neuron.
 
 ```{code-cell} ipython3
 
@@ -388,9 +389,7 @@ $$
 
 where $k$ is the number of free parameters and lower is better.
 
-Since we compute the same quantity for three models, let's wrap it in a small helper. It scores the model on a design matrix (`score` returns the *mean* log-likelihood per sample, so we multiply by the number of samples for the total), reads the free-parameter count straight off the fitted model — filter weights plus intercept — and combines them into the AIC.
-
-We also evaluate every model on the same set of valid bins. The convolution pads the start of each design with NaNs, so rather than hardcoding the window length we let the data tell us which bins are valid: `dropna` on a design returns its non-NaN time support. All three designs share the same padding (the stimulus history is the longest window), so any of them defines the common `valid_epochs`.
+Since we compute the same quantity for three models, let's wrap it in a small helper. It scores the model (`score` returns the *mean* log-likelihood per sample, so we multiply by the number of samples to get the total), reads the number of free parameters off the fitted model (the filter weights plus the intercept), and combines the two into the AIC.
 
 ```{code-cell} ipython3
 def compute_aic(model, X, y):
@@ -398,9 +397,17 @@ def compute_aic(model, X, y):
     ll = model.score(X, y) * y.shape[0]            # score is the per-sample mean
     n_params = model.coef_.size + model.intercept_.size
     return float(-2 * ll + 2 * n_params)
+```
 
-# Align every design and the counts to the bins the convolution left valid.
+One thing to be careful about: the convolution pads the start of each design with NaNs. Rather than hardcoding the window length, let's let the data tell us which bins are valid. Calling `dropna` on a design returns its non-NaN time support, and since all three designs share the same padding (the stimulus history is the longest window), any of them defines the common `valid_epochs`.
+
+```{code-cell} ipython3
 valid_epochs = X.dropna().time_support
+```
+
+Now we can restrict all the time series to `valid_epochs` and compute the AIC safely.
+
+```{code-cell} ipython3
 counts_valid = neuron_counts.restrict(valid_epochs)
 
 aics = {
