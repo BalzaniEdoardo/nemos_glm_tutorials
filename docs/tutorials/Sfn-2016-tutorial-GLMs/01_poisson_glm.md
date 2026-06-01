@@ -14,6 +14,8 @@ kernelspec:
 (tutorial-01)=
 # Tutorial 1 - Poisson GLM
 
+{download}`⬇ Download this tutorial as a Jupyter notebook (.ipynb) <./01_poisson_glm.ipynb>`
+
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 
 It illustrates how to fit a linear-Gaussian GLM (also known as a linear least-squares regression model) and a Poisson GLM (also known as a "linear-nonlinear-Poisson" model) to retinal ganglion cell (RGC) spike trains driven by binary temporal white noise.

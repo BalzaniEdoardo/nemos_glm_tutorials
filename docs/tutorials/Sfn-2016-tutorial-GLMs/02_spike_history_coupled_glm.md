@@ -13,6 +13,8 @@ kernelspec:
 
 # Tutorial 2 - Poisson GLM with Spike History and Coupling
 
+{download}`⬇ Download this tutorial as a Jupyter notebook (.ipynb) <./02_spike_history_coupled_glm.ipynb>`
+
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial2_spikehistcoupledGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 
 
