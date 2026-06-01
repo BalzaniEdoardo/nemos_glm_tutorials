@@ -268,8 +268,8 @@ plt.show()
 
 Instead of using the spike history of the fitted neuron only (auto-correlation filter), we will learn the functional connectivity by including the spike history of all the other neurons. In NeMoS this is trivial, since every basis is applied in a vectorized way over any extra axis:
 
-- If `x` is 1D, then `basis.compute_features(x)` will return a $(\text{n_samples}, \text{n_basis_funcs})$ array.
-- If `x` is ND with shape $(\text{n_samples}, i_1,...,i_{n-1})$, then the output will have shape $(\text{n_samples}, i_1 \cdot \dots \cdot i_{n-1} \cdot \text{n_basis_funcs})$.
+- If `x` is 1D, then `basis.compute_features(x)` will return a $(n_{\text{samples}}, n_{\text{basis}})$ array.
+- If `x` is ND with shape $(n_{\text{samples}}, i_1, \dots, i_{n-1})$, then the output will have shape $(n_{\text{samples}},  n_{\text{basis}}\cdot \prod_{j=1}^{n-1} i_j )$.
 
 Therefore, including all counts as predictors follows exactly the same syntax as the single count array case. The only caveat concerns the basis bookkeeping: we build the coupled design from a freshly constructed basis, `bas_coupling`, leaving the single-neuron `bas` untouched.
 
