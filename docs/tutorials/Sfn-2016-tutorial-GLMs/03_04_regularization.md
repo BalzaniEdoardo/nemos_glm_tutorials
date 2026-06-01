@@ -90,6 +90,12 @@ counts = units.count(bin_size, stimulus.time_support)
 # Re-sample the stimulus
 stimulus = counts.value_from(stimulus, mode="before")
 ```
+:::{admonition} Pre-processing comparison
+:class: tip
+
+Note how the pre-processing pipeline for the upsampled case looks almost identical to the default case by comparing this step with [second tutorial](tutorial-02). Once the spikes are counted at the right resolution, the re-sampling of other time series is derived from it. No need for special interpolation calls.
+
+:::
 
 And now let's visualize the upsampled data.
 
@@ -109,4 +115,22 @@ plt.ylabel('spike count')
 plt.xlabel('time (s)')
 plt.tight_layout()
 plt.show()
+```
+
+Let's divide in train and test set. This is the simplest way of cross-validating, later we will see improved cross-validation schemes.
+
+```{code-cell} ipython3
+# Get the total duration (60 sec)
+ep_tot = stimulus.time_support
+train_frac = 0.8
+
+train_ep = nap.IntervalSet(
+    ep_tot.start, 
+    ep_tot.start + ep_tot.tot_length() * train_frac
+)
+# perform a set difference to get the test set
+test_ep = ep_tot.set_diff(train_ep)
+
+print("Train:\n", train_ep)
+print("\n\nTest:\n", test_ep)
 ```
