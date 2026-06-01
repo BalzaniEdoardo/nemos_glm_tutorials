@@ -11,7 +11,7 @@ kernelspec:
   display_name: Python 3 (ipykernel)
 ---
 
-# Poisson GLM with Spike History and Coupling
+# Tutorial 2 - Poisson GLM with Spike History and Coupling
 
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial2_spikehistcoupledGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 
