@@ -26,7 +26,9 @@ source_suffix = {
 }
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/*_files"]
+# Note: "**/*.ipynb" keeps the build-time generated download notebooks (see
+# the `builder-inited` hook below) from being picked up as duplicate pages.
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/*_files", "**/*.ipynb"]
 
 # -- MyST / MyST-NB configuration --------------------------------------------
 myst_enable_extensions = [
@@ -63,3 +65,28 @@ html_theme_options = {
     "use_download_button": True,
     "path_to_docs": "docs",
 }
+
+
+# -- Downloadable notebooks --------------------------------------------------
+# The tutorials are authored as MyST-Markdown (.md). To offer a ready-to-run
+# "Download as .ipynb" link without committing notebooks to the repo, convert
+# each paired tutorial .md into a sibling .ipynb at build time (clean, no
+# outputs). The `{download}` role in each tutorial points at the result.
+def _generate_download_notebooks(app):
+    import pathlib
+
+    import jupytext
+
+    srcdir = pathlib.Path(app.srcdir)
+    for md_path in srcdir.glob("tutorials/**/*.md"):
+        if "ipynb_checkpoints" in md_path.parts:
+            continue
+        # only convert jupytext-paired notebooks (those carry the frontmatter)
+        if "jupytext:" not in md_path.read_text(encoding="utf-8"):
+            continue
+        notebook = jupytext.read(md_path)
+        jupytext.write(notebook, md_path.with_suffix(".ipynb"))
+
+
+def setup(app):
+    app.connect("builder-inited", _generate_download_notebooks)

@@ -65,6 +65,7 @@ notebooks = [
 docs = [
     "sphinx",                       # Documentation generator
     "myst-nb",                      # Parse + execute MyST-Markdown notebooks
+    "jupytext",                     # Convert tutorial .md -> .ipynb for download links
     "sphinx-book-theme",            # HTML theme used in conf.py
     "sphinx-copybutton",            # "copy" button on code blocks
     "sphinx-togglebutton",          # Collapsible (dropdown) admonitions
