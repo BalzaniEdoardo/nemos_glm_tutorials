@@ -14,7 +14,11 @@ kernelspec:
 (tutorial-01)=
 # Tutorial 1 - Poisson GLM
 
-{download}`⬇ Download this tutorial as a Jupyter notebook (.ipynb) <./01_poisson_glm.ipynb>`
+:::{admonition} Run this tutorial yourself
+:class: tip
+
+Download this page as a {download}`Jupyter notebook (.ipynb) <./01_poisson_glm.ipynb>` and run it locally.
+:::
 
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 

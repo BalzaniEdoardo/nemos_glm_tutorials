@@ -221,3 +221,5 @@ __marimo__/
 _scripts/
 
 .idea/
+# Notebooks generated at docs build time for .ipynb download links
+docs/tutorials/**/*.ipynb
