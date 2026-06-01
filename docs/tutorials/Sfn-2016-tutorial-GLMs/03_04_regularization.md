@@ -14,12 +14,12 @@ kernelspec:
 # Tutorial 3+4 - Gaussian and Poisson GLM with Regularization
 
 
-This tutorial is adapts and combines two notebooks from JW Pillow's material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting:
+This tutorial adapts and combines two notebooks from JW Pillow's material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting:
 
 - [tutorial3_regularization_linGauss.ipynb](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial3_regularization_linGauss.ipynb).
 - [tutorial4_regularization_PoissonGLM.ipynb](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial4_regularization_PoissonGLM.ipynb).
 
- This is an interactive tutorial designed to walk you through how to fit a GLM controlling for under/overfitting via regularization and cross-validation. In particular, we will illustrate two forms of regularization: ridge and laplacian smoothing.
+ This is an interactive tutorial designed to walk you through how to fit a GLM while controlling for under/overfitting via regularization and cross-validation. In particular, we will illustrate two forms of regularization: ridge and L2 smoothing.
 
  (Data from [Uzzell & Chichilnisky, 2004](https://pubmed.ncbi.nlm.nih.gov/15277596/); see `README.txt` file in the `/data_RGCs` directory for details).
 The dataset can be downloaded [here](https://pillowlab.princeton.edu/data/data_RGCs.zip):
@@ -70,8 +70,7 @@ The RGC dataset we've looked at so far requires only a temporal filter (as oppos
 Regularization thus isn't an especially big deal for this data (which was part of our reason for selecting it). However, we can make it look correlated by considering it on a finer timescale than the frame rate of the monitor.  (Indeed, this will make it look highly correlated).
 
 
-Let's first restrict all time series to the first minute, this will allow for a faster runtime for the notebook, then let
-s upsample.
+Let's first restrict all the time series to the first minute — this keeps the notebook fast to run — and then upsample.
 
 ```{code-cell} ipython3
 # Create a 1min long interval set
@@ -81,7 +80,7 @@ epoch_1min = nap.IntervalSet(stimulus.t[0], stimulus.t[0] + 60)
 units = units.restrict(epoch_1min)
 stimulus = stimulus.restrict(epoch_1min)
 
-# Conut with 10x resolution
+# Count with 10x resolution
 upsampling_factor = 10
 bin_size = (stimulus.t[1] - stimulus.t[0]) / upsampling_factor
 
@@ -172,33 +171,32 @@ plt.xlabel('time before spike (s)')
 plt.show()
 ```
 
-This looks quite noisy, and this is because the covariance matrix of the model becomes badly conditioned, i.e. the singular values of the design matrix may have a wide disparity.
+This estimate looks quite noisy. The culprit is that the design matrix is badly conditioned — its singular values span a wide range — which inflates the variance of the unregularized estimate.
 
-We need to control the variance around our estimate. This is when the regularization comes in handy.
+To rein in that variance, we turn to regularization.
 
 ## Ridge regression
 
 ### Linear-Gaussian model
 
-Now let's regularize by adding a penalty on the sum of squared filter coefficients w(i) of the form: 
+Now let's regularize by adding a penalty on the sum of squared filter coefficients $w_i$, of the form
 
-$$\text{penalty}(\lambda) = \lambda*(\sum_i w_i.^2),$$
+$$\text{penalty}(\lambda) = \lambda \sum_i w_i^2,$$
 
-where lambda is known as the "ridge" parameter.  This is also known as an "L2 penalty".  Minimizing error plus this penalty ("penalized least squares") is equivalent to computing the MAP estimate under an iid Gaussian prior on the filter coefficients.  
+where $\lambda$ is the "ridge" parameter. This is also known as an "L2 penalty". Minimizing the error plus this penalty ("penalized least squares") is equivalent to computing the MAP estimate under an i.i.d. Gaussian prior on the filter coefficients.
 
-The MAP estimate for the LG model parameters has a closed form, making it simple and fast to compute: 
+For the linear-Gaussian model the MAP estimate has a closed form, making it simple and fast to compute: 
 
 $$
-\hat{w} = (X^{\top} \cdot X + \lambda \cdot \mathbb{1})^{-1} * X^{\top} \cdot y
+\hat{w} = (X^{\top} \cdot X + \lambda \cdot \mathbb{1})^{-1} \cdot X^{\top} \cdot y
 $$
  
 The only remaining question is: how to set lambda? We'll show the simplest way to do so by cross-validation: try a grid of values and pick the one with the best test set score.
 
 :::{admonition} Cross-validation schemes
+:class: seealso
 
-## TODO: claude, can you clean this up and add references
-
-For more robust cross-validation schemes check out the [`model_selection`](https://scikit-learn.org/stable/api/sklearn.model_selection.html) module of `scikit-learn`. NeMoS is fully compatible with `scikit-learn`, and any of those methods can be applied directly.
+Here we use the simplest possible scheme — a single train/test split. For more robust validation (k-fold, repeated, or stratified splits) reach for the [`model_selection`](https://scikit-learn.org/stable/api/sklearn.model_selection.html) module of `scikit-learn`. NeMoS estimators follow the `scikit-learn` API, so tools like [`GridSearchCV`](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html) and [`KFold`](https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html) work directly on a NeMoS `GLM`.
 :::
 
 
@@ -320,7 +318,7 @@ plot_cv_results(
 
 ### Poisson model
 
-For the poisson GLM it is more of the same. Let's quickly run and plot the results.
+The Poisson GLM is more of the same: we reuse the exact same `cross_val_model`, only switching the observation model from `"Gaussian"` to `"Poisson"`.
 
 ```{code-cell} ipython3
 coefs, intercepts, train_scores, test_scores = cross_val_model(
@@ -371,6 +369,25 @@ import jax.numpy as jnp
 
 
 class L2Smoothing(Regularizer):
+    """L2 smoothing (first-difference) regularizer.
+
+    Penalizes the sum of squared differences between adjacent coefficients,
+    ``sum_i (w[i+1] - w[i]) ** 2``, discouraging large jumps and thus
+    encouraging smooth filters. This is the quadratic form ``w @ (D.T @ D) @ w``
+    with ``D`` the first-difference operator, computed directly from
+    ``jnp.diff`` without forming any matrix.
+
+    Parameters
+    ----------
+    split_fn :
+        Callable that splits the coefficient vector into the per-predictor
+        blocks that should be smoothed independently (e.g.
+        ``basis.split_by_feature``). The penalty is applied to each block and
+        summed, so differencing never crosses the seam between two filters.
+        Defaults to the identity, i.e. the coefficients are treated as a single
+        block — appropriate for a model with a single predictor.
+    """
+
     # solvers this penalty is compatible with
     _allowed_solvers = ["GradientDescent", "BFGS", "LBFGS"]
     # solver used by default
@@ -402,7 +419,7 @@ class L2Smoothing(Regularizer):
 
 ```
 
-Now let's try our new fancy regularizer.
+With a single predictor the default (no split) is all we need, so we can drop it straight into `cross_val_model` in place of `"Ridge"`.
 
 ```{code-cell} ipython3
 
@@ -422,7 +439,7 @@ plot_cv_results(
 
 ### Extra: multiple regressors
 
-One thing you don't want to do with a smoothing penalty, is smooth across predictors. Luckily, our custom regularizer is already able to take care of splitting the covariates.
+There is one thing you *don't* want to do with a smoothing penalty: smooth across predictors. When the design matrix stacks several filters end to end, differencing should stay within each filter and never cross the boundary between them. This is exactly what the `split_fn` is for — we hand `L2Smoothing` the basis' `split_by_feature`, and it penalizes each filter on its own.
 
 ```{code-cell} ipython3
 window_size_stim = 25 * upsampling_factor
