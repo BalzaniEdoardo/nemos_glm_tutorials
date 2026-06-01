@@ -186,7 +186,7 @@ To rein in that variance, we turn to regularization.
 
 Now let's regularize by adding a penalty on the sum of squared filter coefficients $w_i$, of the form
 
-$$\text{penalty}(\lambda) = \lambda \sum_i w_i^2,$$
+$$\text{penalty}(\lambda, \mathbf{w}) = \lambda \sum_i w_i^2,$$
 
 where $\lambda$ is the "ridge" parameter. This is also known as an "L2 penalty". Minimizing the error plus this penalty ("penalized least squares") is equivalent to computing the MAP estimate under an i.i.d. Gaussian prior on the filter coefficients.
 
@@ -341,7 +341,7 @@ plot_cv_results(lambda_grid, coefs_ridge, train_ridge, test_ridge, lags, title="
 So far ridge shrank each coefficient toward zero on its own. A **smoothing** penalty instead discourages large jumps *between adjacent* coefficients — a natural prior for a temporal filter, where we expect neighbouring lags to carry similar weight. It penalizes the sum of squared consecutive differences,
 
 $$
-\text{penalty}(\mathbf{w}) = \sum_i (w_{i+1} - w_i)^2 .
+\text{penalty}(\lambda, \mathbf{w}) = \lambda \sum_i (w_{i+1} - w_i)^2 .
 $$
 
 NeMoS doesn't ship this one out of the box, which makes it a good excuse to see how to build a custom regularizer.
