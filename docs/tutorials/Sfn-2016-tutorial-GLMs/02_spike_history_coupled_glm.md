@@ -305,14 +305,22 @@ But this time, the `spike` component of the design matrix is conveniently reshap
 print("(n_samples, n_neurons, n_basis_funcs): ", split_coupling["spike"].shape)
 ```
 
-Again let's reverse the column order to match the original notebook, and plot the model design.
+Again let's reverse the column order to match the original notebook. This is slightly more involved than in the single-neuron case, because now the two blocks have different rank: `stim` is a 2D array `(n_samples, n_basis)`, while `spike` is 3D `(n_samples, n_neurons, n_basis)`. In both we want to reverse the same axis, the last one (the basis axis), and `arr[..., ::-1]` does exactly that, whatever the array's shape.
+
+On top of that, we want to rebuild a single 2D design matrix `(n_samples, n_regressors)`. Keeping the first (time) axis and flattening all the others together is precisely what `.reshape(n_samples, -1)` does. Putting the two steps together — reverse the last axis, then flatten — and stacking the blocks side by side gives the full coupled design.
 
 ```{code-cell} ipython3
 
 n_samples = X_coupling.shape[0]
 X_coupling = np.hstack(
-    [Xi[...,::-1].reshape((n_samples, -1)) for Xi in split_coupling.values()]
+    [Xi[..., ::-1].reshape(n_samples, -1) for Xi in split_coupling.values()]
 )
+X_coupling
+```
+
+Let's plot it.
+
+```{code-cell} ipython3
 
 # Take first 50 valid samples
 X_slice = X_coupling[window_size_stim: window_size_stim+50]
