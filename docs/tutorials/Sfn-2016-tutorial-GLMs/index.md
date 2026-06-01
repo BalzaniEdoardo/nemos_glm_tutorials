@@ -23,9 +23,16 @@ The original Matlab implementation and its python translation can be found at th
 02_spike_history_coupled_glm.md
 ```
 
+```{toctree}
+:maxdepth: 2
+
+03_04_regularization.md
+```
+
 ## What's changed
 
-- As of NeMoS version `0.2.7`, the smoothing Laplacian prior is not shipped with the package. This prior was used in the original `tutorial3_regularization_linGauss` and `tutorial4_regularization_PoissonGLM`. Smoothing is obtained by basis expansion approximation instead. 
+- Tutorial 3 and 4 on regularization have been merged into a single one.
+- In the regularization tutorial, an example is shown on how to smooth over multiple predictors.
 
 ## Citation
 

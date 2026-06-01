@@ -11,6 +11,7 @@ kernelspec:
   display_name: Python 3 (ipykernel)
 ---
 
+(tutorial-02)=
 # Tutorial 2 - Poisson GLM with Spike History and Coupling
 
 :::{admonition} Run this tutorial yourself
