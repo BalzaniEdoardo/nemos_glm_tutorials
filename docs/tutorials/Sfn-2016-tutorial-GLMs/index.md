@@ -29,6 +29,12 @@ The original Matlab implementation and its python translation can be found at th
 03_04_regularization.md
 ```
 
+```{toctree}
+:maxdepth: 2
+
+05_decoding.md
+```
+
 ## What's changed
 
 - Tutorial 3 and 4 on regularization have been merged into a single one.
