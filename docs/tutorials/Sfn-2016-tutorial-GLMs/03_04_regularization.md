@@ -26,7 +26,7 @@ This tutorial adapts and combines two notebooks from JW Pillow's material, prese
 
  This is an interactive tutorial designed to walk you through how to fit a GLM while controlling for under/overfitting via regularization and cross-validation. In particular, we will illustrate two forms of regularization: ridge and L2 smoothing.
 
- (Data from [Uzzell & Chichilnisky, 2004](https://pubmed.ncbi.nlm.nih.gov/15277596/); see `README.txt` file in the `/data_RGCs` directory for details).
+ (Data from [Uzzell & Chichilnisky, 2004](https://pubmed.ncbi.nlm.nih.gov/15277596/); see [`README.txt`](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/data_RGCs/README.txt) file in the `/data_RGCs` directory for details).
 The dataset can be downloaded [here](https://pillowlab.princeton.edu/data/data_RGCs.zip):
 
 The dataset is provided for tutorial purposes only, and should not be distributed or used for publication without express permission from EJ Chichilnisky (ej@stanford.edu).
