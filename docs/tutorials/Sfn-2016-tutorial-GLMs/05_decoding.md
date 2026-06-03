@@ -22,9 +22,11 @@ Download this page as a {download}`Jupyter notebook (.ipynb) <./05_decoding.ipyn
 
 This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial5_MAPdecoding.ipynb)'s material, presented at the *Data Science and Data Skills for Neuroscientists* short course at the SfN 2016 meeting.
 
+## Introduction
+
 So far we have been doing **encoding**: given a stimulus, predict the spikes. Here we flip the direction and perform **decoding**: given the spikes, recover the variable that drove them.
 
-The variable $\mathbf{s}$ we read out need not be an explicit input we control. In this tutorial it is the visual stimulus presented to the retina — an input we know, which lets us check the decode against ground truth. But it could equally be the animal's head direction, which is never supplied to the brain directly yet is reliably encoded by — and therefore decodable from — medial entorhinal cortex (MEC) units.
+The variable $\mathbf{s}$ we decode need not be an external input we control. In this tutorial it is the visual stimulus shown to the retina — a signal we know exactly, so we can check the decode against ground truth. But $\mathbf{s}$ could equally be a variable the brain represents internally: a concrete example is the animal's head direction, which is never fed in as an explicit input yet is reliably encoded by — and therefore decodable from — medial entorhinal cortex (MEC) units.
 
 ### Notation
 
