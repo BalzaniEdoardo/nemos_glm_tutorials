@@ -11,6 +11,7 @@ kernelspec:
   display_name: Python 3 (ipykernel)
 ---
 
+(tutorial-03-04)=
 # Tutorial 3+4 - Gaussian and Poisson GLM with Regularization
 
 :::{admonition} Run this tutorial yourself
