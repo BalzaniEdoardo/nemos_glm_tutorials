@@ -332,6 +332,9 @@ axs.plot(t_bins, result_stim_spk.x,  color=PALETTE[1], lw=2, ls="--",
 axs.set_title("Decoded vs true stimulus")
 axs.set_xlabel("time (bins)")
 axs.set_ylabel("stimulus value")
+# leave headroom above the [-0.48, 0.48] stimulus range so the legend
+# does not overlap the traces
+axs.set_ylim(-0.55, 0.85)
 axs.legend(loc="upper right")
 
 plt.tight_layout()
