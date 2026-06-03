@@ -26,7 +26,7 @@ This tutorial is an adaptation of [JW Pillow](https://github.com/pillowlab/GLMsp
 
 So far we have been doing **encoding**: given a stimulus, predict the spikes. Here we flip the direction and perform **decoding**: given the spikes, recover the variable that drove them.
 
-The variable $\mathbf{s}$ we decode need not be an external input we control. In this tutorial it is the visual stimulus shown to the retina — a signal we know exactly, so we can check the decode against ground truth. But $\mathbf{s}$ could equally be a variable the brain represents internally: a concrete example is the animal's head direction, which is never fed in as an explicit input yet is reliably encoded by — and therefore decodable from — medial entorhinal cortex (MEC) units.
+In this example the variable being decoded is the visual stimulus; however, the same approach can be used to decode any other variable, including behavioral covariates such as the animal's position or head direction. As long as the variable is encoded in the neural activity, we should be able to decode it from the spikes.
 
 ### Notation
 
