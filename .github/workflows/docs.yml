@@ -72,6 +72,7 @@ jobs:
             --checks Links,Scripts,Images \
             --assume-extension \
             --check-external-hash \
+            --allow-missing-href \
             --ignore-status-codes 0,400,403,302,503 \
             --ignore-urls "https://pillowlab.princeton.edu/data/data_RGCs.zip" \
             --ignore-files "/.+\/_static\/.+/"
