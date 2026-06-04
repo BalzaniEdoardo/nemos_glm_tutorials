@@ -153,9 +153,8 @@ glm_stim
 ```{code-cell} ipython3
 window_size_spk = 20
 
-b_stim = nmo.basis.HistoryConv(window_size_stim, label="stim", conv_kwargs={"shift": False})
-b_spk  = nmo.basis.HistoryConv(window_size_spk,  label="spike")
-basis_stim_spk = b_stim + b_spk
+basis_spk  = nmo.basis.HistoryConv(window_size_spk,  label="spike")
+basis_stim_spk = basis_stim + basis_spk
 
 X_stim_spk = basis_stim_spk.compute_features(stimulus[:n_train], counts[:n_train])
 glm_stim_spk = nmo.glm.GLM(observation_model="Poisson", solver_name="BFGS")
