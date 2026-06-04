@@ -165,7 +165,7 @@ glm_stim_spk
 Let's visualize the fitted stimulus filter from the simpler model.
 
 ```{code-cell} ipython3
-lags = np.arange(-window_size + 1, 1) * bin_size
+lags = np.arange(-window_size_stim + 1, 1) * bin_size
 
 fig, ax = plt.subplots(figsize=(6, 3))
 ax.axhline(0, color="0.7", linestyle="--")
