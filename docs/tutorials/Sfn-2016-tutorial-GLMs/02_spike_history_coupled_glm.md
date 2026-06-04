@@ -40,7 +40,7 @@ For more details on the `pynapple` objects and a step-by-step walkthrough of the
 
 import matplotlib.pyplot as plt
 import numpy as np
-from nemos_tutorials import fetch_data, PALETTE, plot_counts
+from nemos_tutorials import fetch_data, PALETTE, plot_counts, plot_design_matrix
 import pynapple as nap
 import jax
 from scipy.io import loadmat
@@ -168,35 +168,19 @@ As in the [first tutorial](design-matrix-tutorial-01), we build the design with 
 
 Now let's plot the design. Let's remember that NeMoS performs a convolution in mode `valid`, and append NaNs to preserve the total number of samples, which naturally maintains the temporal alignment with the predicted variable.
 
-```{code-cell} ipython3
-# skip the first NaNs
-X_slice = X[window_size_stim:window_size_stim+50]
-counts_slice = neuron_counts[window_size_stim:window_size_stim+50]
+For display we reorder each feature's columns so the most lagged lag comes first
+(see `plot_design_matrix`), reusing the `split_dict` from above and skipping the
+NaN-padded burn-in.
 
-fig = plt.figure(figsize=[12,8])
-plt.subplot(1, 10, (1,9))
-vmin = min(X_slice.min(), counts_slice.min())
-vmax = max(X_slice.max(), counts_slice.max())
-plt.imshow(
-    X_slice, 
-    aspect='auto', 
-    interpolation='nearest', 
-    vmin=vmin,
-    vmax=vmax,
+```{code-cell} ipython3
+# skip the first NaNs and zoom into a 50-bin window
+rows = slice(window_size_stim, window_size_stim + 50)
+plot_design_matrix(
+    split_dict,
+    counts=neuron_counts,
+    rows=rows,
+    title="design matrix (including stim and spike history)",
 )
-plt.xlabel('regressor')
-plt.ylabel('time bin of response')
-plt.title('design matrix (including stim and spike history)')
-plt.subplot(1,10,10)
-plt.imshow(
-    counts_slice[:, None], 
-    aspect='auto', 
-    interpolation='nearest',
-    vmin=vmin,
-    vmax=vmax,
-)
-plt.yticks(ticks=[], labels=[])
-plt.title('spike count')
 plt.tight_layout()
 plt.show()
 ```
@@ -323,13 +307,12 @@ Let's plot it.
 
 ```{code-cell} ipython3
 
-# Take first 50 valid samples
-X_slice = X_coupling[window_size_stim: window_size_stim+50]
-fig = plt.figure(figsize=[12,8])
-plt.imshow(X_slice, aspect='auto', interpolation='nearest')
-plt.xlabel('regressor')
-plt.ylabel('time bin of response')
-plt.title('design matrix (stim and 4 neurons spike history)')
+# same per-feature reordering, now on the coupled split (the spike block is 3D)
+plot_design_matrix(
+    split_coupling,
+    rows=slice(window_size_stim, window_size_stim + 50),
+    title="design matrix (stim and 4 neurons spike history)",
+)
 plt.show()
 ```
 

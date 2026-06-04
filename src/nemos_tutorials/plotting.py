@@ -59,3 +59,73 @@ def plot_counts(
         ax.set_ylim(*ylim)
     ax.legend(fontsize=8, framealpha=0.6)
     return ax
+
+
+def plot_design_matrix(split, counts=None, rows=None, title="design matrix"):
+    """Display a design matrix with each feature's lags ordered oldest-first.
+
+    NeMoS' ``HistoryConv`` returns each feature block with the *most recent* lag
+    in its first column. That makes the raw image read right-to-left in time and,
+    for the spike-history block, lines the most recent lag up against the response
+    counts. For a readable picture we want the opposite — most lagged column
+    first — so the image reads left (past) to right (present), matching the
+    original tutorials.
+
+    Reversing the whole matrix would mix the stimulus and spike-history blocks, so
+    instead we flip each feature block on its own basis axis (operating on the
+    ``split_by_feature`` dict the notebook already built) and stitch them back.
+
+    Parameters
+    ----------
+    split:
+        Mapping ``feature -> block`` from ``basis.split_by_feature(design, axis=1)``.
+        Each block's last axis is the basis (lag) axis; extra axes (e.g. the
+        per-neuron axis of a coupling block) are flattened into the columns.
+    counts:
+        Optional response counts to show as a thin panel on the right, sharing the
+        color scale. When ``None`` only the design matrix is drawn.
+    rows:
+        Optional row ``slice`` applied to every block (and to ``counts``), e.g. to
+        skip the NaN-padded burn-in and zoom into a short window.
+    title:
+        Title for the design-matrix panel.
+    """
+    if rows is None:
+        rows = slice(None)
+
+    # Flip the basis (last) axis of each feature block on its own, flatten any
+    # extra axes into the column dimension, then stack the blocks side by side.
+    blocks = []
+    for block in split.values():
+        block = block[rows]
+        blocks.append(block[..., ::-1].reshape((block.shape[0], -1)))
+    reordered = np.hstack(blocks)
+
+    if counts is None:
+        _, ax = plt.subplots(figsize=[12, 8])
+        ax.imshow(reordered, aspect="auto", interpolation="nearest")
+        ax.set_xlabel("regressor")
+        ax.set_ylabel("time bin of response")
+        ax.set_title(title)
+        return ax
+
+    counts = counts[rows]
+    vmin = min(reordered.min(), counts.min())
+    vmax = max(reordered.max(), counts.max())
+
+    fig = plt.figure(figsize=[12, 8])
+    ax_design = plt.subplot(1, 10, (1, 9))
+    ax_design.imshow(
+        reordered, aspect="auto", interpolation="nearest", vmin=vmin, vmax=vmax
+    )
+    ax_design.set_xlabel("regressor")
+    ax_design.set_ylabel("time bin of response")
+    ax_design.set_title(title)
+
+    ax_counts = plt.subplot(1, 10, 10)
+    ax_counts.imshow(
+        counts[:, None], aspect="auto", interpolation="nearest", vmin=vmin, vmax=vmax
+    )
+    ax_counts.set_yticks([])
+    ax_counts.set_title("spike count")
+    return fig
