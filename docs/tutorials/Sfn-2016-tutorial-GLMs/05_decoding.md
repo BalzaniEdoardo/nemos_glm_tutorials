@@ -138,9 +138,6 @@ Decoding requires a forward model. We fit two: a stimulus-only Poisson GLM (same
 
 basis_stim = nmo.basis.HistoryConv(window_size_stim, label="stim", conv_kwargs={"shift": False})
 X_stim = basis_stim.compute_features(stimulus[:n_train])
-# Reverse the column order so coef_ runs from the most distant lag to the
-# present, matching the convention of the earlier tutorials (see Tutorial 1).
-X_stim = X_stim[:, ::-1]
 y_train = neuron_counts[:n_train]
 
 glm_stim = nmo.glm.GLM(observation_model="Poisson")
@@ -169,7 +166,9 @@ lags = np.arange(-window_size_stim + 1, 1) * bin_size
 
 fig, ax = plt.subplots(figsize=(6, 3))
 ax.axhline(0, color="0.7", linestyle="--")
-ax.plot(lags, glm_stim.coef_, "o-", color=PALETTE[0])
+# reverse the coef to match original convention 
+# (see tutorial 1) for details
+ax.plot(lags, glm_stim.coef_[::-1], "o-", color=PALETTE[0])
 ax.set_title("Fitted stimulus filter")
 ax.set_xlabel("time before spike (s)")
 ax.set_ylabel("weight")
@@ -227,7 +226,6 @@ def map_objective_stim(pred_stim, glm, basis, y_test, Cinv):
     # Build design matrix and keep only the test-window rows. Reverse the
     # columns to match the convention used when the model was fitted.
     X_pred = basis.compute_features(xx)
-    X_pred = X_pred[:, ::-1]
     X_pred = X_pred[-pred_stim.shape[0]:]
 
     # Negative log-likelihood under the fitted GLM.

@@ -148,11 +148,19 @@ As a first step, let's fit a linear gaussian model without any regularization. W
 ```{code-cell} ipython3
 import nemos as nmo
 
-# Define a design matrix & reverse column order 
-# to match original implementation
+# Define the design matrix
 window_size = 20 * upsampling_factor
 bas = nmo.basis.HistoryConv(window_size)
-X = bas.compute_features(stimulus)[:, ::-1]
+X = bas.compute_features(stimulus)
+```
+
+As in the [first tutorial](design-matrix-tutorial-01), the `HistoryConv` columns come in the reverse order from the original notebook; this doesn't change the model (see the note [there](design-matrix-tutorial-01)), so we flip only when plotting. Since we plot filters repeatedly below, let's wrap that reordering into a small helper.
+
+```{code-cell} ipython3
+def plot_filter(ax, lags, weights, **kwargs):
+    # NeMoS' HistoryConv returns the weights with the most recent lag first, so we
+    # flip them with [::-1] to align with lag time and match the original notebook.
+    ax.plot(lags, weights[::-1], **kwargs)
 ```
 
 Now, let's fit the linear Gaussian model and plot the coefficients.
@@ -168,12 +176,11 @@ gaussian_glm = nmo.glm.GLM(observation_model="Gaussian", solver_name="BFGS").fit
 )
 
 # Plot the coefficients
-
 lags = np.arange(-window_size+1,1) * bin_size
-plt.figure()
-plt.plot(lags, gaussian_glm.coef_)
-plt.title('Fit results')
-plt.xlabel('time before spike (s)')
+fig, ax = plt.subplots()
+plot_filter(ax, lags, gaussian_glm.coef_)
+ax.set_title('Fit results')
+ax.set_xlabel('time before spike (s)')
 plt.show()
 ```
 
@@ -302,7 +309,7 @@ def plot_cv_results(lambdas, coefs, train_scores, test_scores, lags, title=""):
 
     axs[0, 1].set_title("Filters across lambda")
     for cf, l in zip(coefs, lambdas):
-        axs[0, 1].plot(lags, cf, linewidth=4, label=f"lambda: {l:.2e}")
+        plot_filter(axs[0, 1], lags, cf, linewidth=4, label=f"lambda: {l:.2e}")
     axs[0, 1].set_xlabel("time before spike (s)")
 
     axs[1, 0].set_title("Test log-likelihood")
@@ -310,7 +317,7 @@ def plot_cv_results(lambdas, coefs, train_scores, test_scores, lags, title=""):
     axs[1, 0].set_xlabel("lambda")
 
     axs[1, 1].set_title("Best estimate (max test LL)")
-    axs[1, 1].plot(lags, coefs[np.argmax(test_scores)])
+    plot_filter(axs[1, 1], lags, coefs[np.argmax(test_scores)])
     axs[1, 1].set_xlabel("time before spike (s)")
 
     fig.tight_layout()
@@ -454,8 +461,8 @@ print(f"Best smoothing test LL: {np.max(test_smooth):.5f}")
 
 plt.figure(figsize=[8, 5])
 plt.axhline(0, color="k", linestyle="--", linewidth=1)
-plt.plot(lags, best_ridge, linewidth=3, label="ridge")
-plt.plot(lags, best_smooth, linewidth=3, label="L2 smoothing")
+plot_filter(plt.gca(), lags, best_ridge, linewidth=3, label="ridge")
+plot_filter(plt.gca(), lags, best_smooth, linewidth=3, label="L2 smoothing")
 plt.title("Best filters by test log-likelihood (Poisson GLM)")
 plt.xlabel("time before spike (s)")
 plt.ylabel("coefficient")
@@ -475,12 +482,6 @@ additive = (
 )
 X_multi = additive.compute_features(stimulus, neuron_counts)
 
-# Reverse the columns to match other plots
-split_coupling = additive.split_by_feature(X_multi, axis=1)
-n_samples = X_multi.shape[0]
-X_multi = np.hstack(
-    [Xi[..., ::-1].reshape((n_samples, -1)) for Xi in split_coupling.values()]
-)
 reg_multi = L2Smoothing(lambda x: additive.split_by_feature(x, axis=0))
 model = nmo.glm.GLM(regularizer=reg_multi)
 model.fit(
@@ -498,7 +499,7 @@ fig, axs = plt.subplots(1, len(filters), figsize=[12, 4])
 for ax, (label, filt) in zip(axs, filters.items()):
     filt = np.asarray(filt).squeeze()
     lag = np.arange(-filt.shape[0] + 1, 1) * bin_size
-    ax.plot(lag, filt, linewidth=2)
+    plot_filter(ax, lag, filt, linewidth=2)
     ax.set_title(f"{label} filter")
     ax.set_xlabel("time before spike (s)")
 fig.tight_layout()
