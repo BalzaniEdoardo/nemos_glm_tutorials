@@ -118,7 +118,7 @@ We set aside the first quarter of the recording as training data and reserve a s
 ```{code-cell} ipython3
 n_train = int(stimulus.size * (1 / 4))
 n_test = 50
-window_size_stim = 25
+window_size_stim = 20
 
 # The test window starts after the training data, offset by the filter length
 # so that the design matrix has no NaN-padded rows in the test window.
@@ -135,9 +135,8 @@ Decoding requires a forward model. We fit two: a stimulus-only Poisson GLM (same
 ### Stimulus-only GLM
 
 ```{code-cell} ipython3
-window_size = 20
 
-basis_stim = nmo.basis.HistoryConv(window_size, label="stim", conv_kwargs={"shift": False})
+basis_stim = nmo.basis.HistoryConv(window_size_stim, label="stim", conv_kwargs={"shift": False})
 X_stim = basis_stim.compute_features(stimulus[:n_train])
 # Reverse the column order so coef_ runs from the most distant lag to the
 # present, matching the convention of the earlier tutorials (see Tutorial 1).
