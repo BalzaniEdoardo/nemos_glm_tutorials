@@ -164,14 +164,9 @@ for key, Xi in split_dict.items():
 
 ```
 
-Finally, let's revert the column order for each predictor, as we did in the [first tutorial](design-matrix-tutorial-01). As before, this doesn't change the model, but matches the design construction of the original implementation, which is handy if one wants to compare the two notebooks. 
+As in the [first tutorial](design-matrix-tutorial-01), we build the design with the `HistoryConv` basis, which means each predictor's columns come in the reverse order from the original notebook. This doesn't change the model — see the note [there](design-matrix-tutorial-01) for why — so we keep NeMoS' natural column order and flip only when plotting the filters.
 
-```{code-cell} ipython3
-# Revert the column order and concatenate
-X = np.hstack([Xi[...,::-1] for Xi in split_dict.values()])
-```
-
-Finally, let's plot the design. Let's remember that NeMoS performs a convolution in mode `valid`, and append NaNs to preserve the total number of samples, which naturally maintains the temporal alignment with the predicted variable.
+Now let's plot the design. Let's remember that NeMoS performs a convolution in mode `valid`, and append NaNs to preserve the total number of samples, which naturally maintains the temporal alignment with the predicted variable.
 
 ```{code-cell} ipython3
 # skip the first NaNs
@@ -221,6 +216,18 @@ model_stim_only.fit(bas.split_by_feature(X, axis=1)["stim"], neuron_counts)
 model_stim_spk.fit(X, neuron_counts)
 ```
 
+Both filter plots below need the weights reordered the same way, so let's define a small helper that does the reordering and draws a single filter onto a given axis.
+
+```{code-cell} ipython3
+def plot_filter(ax, lags, weights, title, **kwargs):
+    # NeMoS' HistoryConv returns the weights with the most recent lag first, so we
+    # flip them with [::-1] to align with lag time and match the original notebook.
+    ax.plot(lags, weights[::-1], marker="o", **kwargs)
+    ax.set_title(title)
+    ax.set_xlabel("time before spike (s)")
+    ax.set_ylabel("weight")
+```
+
 And finally, let's plot and compare the filters.
 
 ```{code-cell} ipython3
@@ -231,16 +238,13 @@ coef_dict = bas.split_by_feature(model_stim_spk.coef_, axis=0)
 f, (ax1, ax2) = plt.subplots(2,1)
 lags_stim = np.arange(-1 * window_size_stim + 1,1) * bin_size
 lags_spk = np.arange(-1 * window_size_spk + 1,1) * bin_size
-ax1.plot(lags_stim, model_stim_only.coef_, marker="o", color=PALETTE[0], label='stim only')
-ax1.plot(lags_stim, coef_dict["stim"], marker="o", color=PALETTE[1], label='stim + sp hist')
-ax1.legend(loc='upper left')
-ax1.set_title('stimulus filters')
-ax1.set_ylabel('weight')
-ax1.set_xlabel('time before spike (s)')
-ax2.plot(lags_spk, coef_dict["spike"], marker="o", color=PALETTE[1])
-ax2.set_title('spike history filter')
-ax1.set_xlabel('time before spike (s)')
-ax1.set_ylabel('weight')
+
+plot_filter(ax1, lags_stim, model_stim_only.coef_, "stimulus filters", color=PALETTE[0], label="stim only")
+plot_filter(ax1, lags_stim, coef_dict["stim"], "stimulus filters", color=PALETTE[1], label="stim + sp hist")
+ax1.legend(loc="upper left")
+
+plot_filter(ax2, lags_spk, coef_dict["spike"], "spike history filter", color=PALETTE[1])
+
 plt.tight_layout()
 plt.show()
 ```
@@ -313,18 +317,7 @@ But this time, the `spike` component of the design matrix is conveniently reshap
 print("(n_samples, n_neurons, n_basis_funcs): ", split_coupling["spike"].shape)
 ```
 
-Again let's reverse the column order to match the original notebook. This is slightly more involved than in the single-neuron case, because now the two blocks have different rank: `stim` is a 2D array `(n_samples, n_basis)`, while `spike` is 3D `(n_samples, n_neurons, n_basis)`. In both we want to reverse the same axis, the last one (the basis axis), and `arr[..., ::-1]` does exactly that, whatever the array's shape.
-
-On top of that, we want to rebuild a single 2D design matrix `(n_samples, n_regressors)`. Keeping the first (time) axis and flattening all the others together is precisely what `.reshape((n_samples, -1))` does. Putting the two steps together — reverse the last axis, then flatten — and stacking the blocks side by side gives the full coupled design.
-
-```{code-cell} ipython3
-
-n_samples = X_coupling.shape[0]
-X_coupling = np.hstack(
-    [Xi[..., ::-1].reshape((n_samples, -1)) for Xi in split_coupling.values()]
-)
-X_coupling
-```
+As in the single-neuron case, the `HistoryConv` columns come in the reverse order from the original notebook, and we keep NeMoS' order here too (see the [first tutorial](design-matrix-tutorial-01) for why). The design is already a single 2D matrix `(n_samples, n_regressors)`, so we can use it as is.
 
 Let's plot it.
 
@@ -358,19 +351,16 @@ coef_coupling_dict = bas_coupling.split_by_feature(model_coupled.coef_, axis=0)
 f, (ax1, ax2) = plt.subplots(2,1)
 lags_stim = np.arange(-1 * window_size_stim + 1,1) * bin_size
 lags_spk = np.arange(-1 * window_size_spk + 1,1) * bin_size
-ax1.plot(lags_stim, model_stim_only.coef_, marker="o", color=PALETTE[0], label='stim only')
-ax1.plot(lags_stim, coef_dict["stim"], marker="o", color=PALETTE[1], label='stim + sp hist')
-ax1.plot(lags_stim, coef_coupling_dict["stim"], marker="o", color=PALETTE[2], label='stim + coupling')
-ax1.legend(loc='upper left')
-ax1.set_title('stimulus filters')
-ax1.set_ylabel('weight')
-ax1.set_xlabel('time before spike (s)')
-ax2.plot(lags_spk, coef_dict["spike"], marker="o", color=PALETTE[1])
+
+plot_filter(ax1, lags_stim, model_stim_only.coef_, "stimulus filters", color=PALETTE[0], label="stim only")
+plot_filter(ax1, lags_stim, coef_dict["stim"], "stimulus filters", color=PALETTE[1], label="stim + sp hist")
+plot_filter(ax1, lags_stim, coef_coupling_dict["stim"], "stimulus filters", color=PALETTE[2], label="stim + coupling")
+ax1.legend(loc="upper left")
+
+plot_filter(ax2, lags_spk, coef_dict["spike"], "spike history filter", color=PALETTE[1])
 for i, coef in enumerate(coef_coupling_dict["spike"]):
-    ax2.plot(lags_spk, coef, marker="o", ls="--", color=PALETTE[2+i])
-ax2.set_title('spike history filter')
-ax1.set_xlabel('time before spike (s)')
-ax1.set_ylabel('weight')
+    plot_filter(ax2, lags_spk, coef, "spike history filter", ls="--", color=PALETTE[2+i])
+
 plt.tight_layout()
 
 plt.show()
