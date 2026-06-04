@@ -115,7 +115,7 @@ plt.show()
 
 Let's build a design matrix that uses as predictors the history of the stimulus (as in the first tutorial), and the spike count history of the neuron we are fitting. The last term will capture the autocorrelation structure of the spike count time series.
 
-As before, we can use the NeMoS [`HistoryConv`](https://nemos.readthedocs.io/en/latest/generated/basis/nemos.basis.HistoryConv.html) basis to capture the history effect of both predictors. One way to construct this is to create two basis, create the design matrices, and then concatenate them. An alternative and easier way to construct the same predictor in NeMoS is to use basis addition: adding two basis together result in a composite basis that concatenate design matrices.
+As before, we can use the NeMoS [`HistoryConv`](https://nemos.readthedocs.io/en/latest/api/generated/basis/nemos.basis.HistoryConv.html#nemos.basis.HistoryConv) basis to capture the history effect of both predictors. One way to construct this is to create two basis, create the design matrices, and then concatenate them. An alternative and easier way to construct the same predictor in NeMoS is to use basis addition: adding two basis together result in a composite basis that concatenate design matrices.
 
 ```{code-cell} ipython3
 import nemos as nmo

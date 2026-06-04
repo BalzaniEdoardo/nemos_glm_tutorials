@@ -219,7 +219,7 @@ $$ (eq-design-matrix)
 
 Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, because we need at least $w$ stimulus values to fill a row. 2) Each row is a shifted copy of the row above.
 
-A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix. In `NeMoS`, convolution with the identity is exactly what the [`HistoryConv`](https://nemos.readthedocs.io/en/latest/generated/basis/nemos.basis.HistoryConv.html) basis does.
+A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix. In `NeMoS`, convolution with the identity is exactly what the [`HistoryConv`](https://nemos.readthedocs.io/en/latest/api/generated/basis/nemos.basis.HistoryConv.html#nemos.basis.HistoryConv) basis does.
 
 There is one subtlety to be aware of: convolving with the identity returns the columns in the *reverse* order relative to {eq}`eq-design-matrix`. The first column holds the most recent stimulus sample, and the last column the stimulus $w$ samples in the past. [Pillow's original notebook](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb) reverses the columns to restore the left-to-right ordering of {eq}`eq-design-matrix`; we don't bother, because the flipped design fits an equivalent model.
 
