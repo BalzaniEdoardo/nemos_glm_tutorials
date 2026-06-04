@@ -219,7 +219,17 @@ $$ (eq-design-matrix)
 
 Two things to notice: 1) $X$ has $T-w$ rows, where $T$ is `len(stimulus)`, because we need at least $w$ stimulus values to fill a row. 2) Each row is a shifted copy of the row above.
 
-A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix and then reverse the column order. In `NeMoS`, convolution with the identity is exactly what the [`HistoryConv`](https://nemos.readthedocs.io/en/latest/generated/basis/nemos.basis.HistoryConv.html) basis does.
+A convenient way to construct this design matrix is to convolve the stimulus with an identity matrix. In `NeMoS`, convolution with the identity is exactly what the [`HistoryConv`](https://nemos.readthedocs.io/en/latest/generated/basis/nemos.basis.HistoryConv.html) basis does.
+
+There is one subtlety to be aware of: convolving with the identity returns the columns in the *reverse* order relative to {eq}`eq-design-matrix`. The first column holds the most recent stimulus sample, and the last column the stimulus $w$ samples in the past. [Pillow's original notebook](https://github.com/pillowlab/GLMspiketraintutorial_python/blob/main/tutorial1_PoissonGLM.ipynb) reverses the columns to restore the left-to-right ordering of {eq}`eq-design-matrix`; we don't bother, because the flipped design fits an equivalent model.
+
+:::{admonition} Why the flipped column order doesn't matter
+:class: note
+
+The GLM prediction is a linear combination of the design-matrix columns — a weighted sum $\hat\eta_t = \sum_j w_j X_{t,j}$. Permuting the columns and applying the *same* permutation to the weights $w_j$ leaves every term of that sum untouched, so the prediction, the likelihood, and the fitted model are all identical. Reversing the columns is just the special case where that permutation is a flip. Fitting on the natural `HistoryConv` design and fitting on Pillow's reversed design therefore yield the same model, with the recovered filters related by that same flip.
+
+The only place this surfaces is **plotting**. Because we keep the columns in `HistoryConv` order, the fitted filter (and the STA below) comes out time-reversed relative to Pillow's figures. Whenever we plot a filter or STA against lag time we flip it back with `[::-1]`, purely so our plots line up with the original notebook's convention — it has no effect on the fit itself.
+:::
 
 ```{code-cell} ipython3
 import nemos as nmo
@@ -232,8 +242,6 @@ bas = nmo.basis.HistoryConv(window_size, conv_kwargs={"shift": False})
 
 # Convolve with the identity
 X = bas.compute_features(stimulus)
-# Reverse column order (to match original notebook)
-X = X[:,::-1]
 ```
 
 As you can see:
@@ -241,7 +249,7 @@ As you can see:
 1. The design matrix is still a `pynapple` object: the time-series information is preserved, including the time axis and the time support.
 2. `X` has the same number of samples as `stimulus`. The convolution itself runs in `valid` mode, which produces only $T - w$ values, but `NeMoS` pads the result with NaNs back to length $T$. This keeps `X` and `counts` aligned.
 
-Reversing the column order (or not) yields an equivalent design; it only changes how the columns are interpreted. Following {eq}`eq-design-matrix`, the first column holds the stimulus $w$ samples in the past, and the last column holds the most recent stimulus sample.
+Plotting a slice of `X` makes the column order concrete: reading each row left to right, the leftmost column is the most recent stimulus sample and the rightmost is the stimulus $w$ samples in the past — the reverse of {eq}`eq-design-matrix`, as noted above.
 
 ```{code-cell} ipython3
 plt.pcolormesh(X[window_size:window_size+50], cmap="Pastel1")
@@ -252,7 +260,7 @@ plt.show()
 
 When the stimulus is white noise, the STA is an unbiased estimator of the filter in a GLM / LNP model, as long as the nonlinearity yields an STA whose expectation is nonzero. (Feel free to skip this technical aside: it simply means that a symmetric nonlinearity, e.g. $x^2$, breaks the condition and the STA becomes uninformative.)
 
-Even when your stimulus is not white noise, it is often worth visualizing the STA: if it shows no structure at all, that is a sign something has gone wrong upstream, for example a mismatch between the design matrix and the binned spike counts.
+Even when your stimulus is not white noise, it is often worth visualizing the STA: if it shows no structure at all, that is a sign something has gone wrong upstream, for example a mismatch between the design matrix and the binned spike counts. Note that for plotting we will reverse the STA array to match the convention of the original notebooks.
 
 ```{code-cell} ipython3
 import numpy as np
@@ -273,7 +281,8 @@ lag_times = np.arange(-window_size+1,1) / neuron_counts.rate  # time bins for ST
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(lag_times, sta, "o-", color=PALETTE[0])
+# revert to match the original notebook convention
+plt.plot(lag_times, sta[::-1], "o-", color=PALETTE[0])
 plt.title("STA")
 plt.xlabel("time before spike (s)")
 plt.xlim([lag_times[0],lag_times[-1]])
@@ -303,8 +312,9 @@ wsta = np.linalg.pinv(X_valid.d.T @ X_valid.d) @ sta * neuron_counts.sum()
 
 plt.figure()
 plt.axhline(0, color="0.7", linestyle="--")
-plt.plot(lag_times, sta/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
-plt.plot(lag_times, wsta/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
+# flip with [::-1] to match the original notebook convention
+plt.plot(lag_times, sta[::-1]/np.linalg.norm(sta), "o-", color=PALETTE[0], label="STA")
+plt.plot(lag_times, wsta[::-1]/np.linalg.norm(wsta), "o-", color=PALETTE[1], label="wSTA")
 plt.title("STA and whitened STA")
 plt.xlabel("time before spike (s)")
 plt.xlim([lag_times[0],lag_times[-1]])
@@ -427,8 +437,9 @@ rate_exp_poisson_glm = exp_poisson_glm.predict(X)
 
 fig, (ax1,ax2) = plt.subplots(2, figsize=(8, 6))
 
-ax1.plot(lag_times, gaussian_glm.coef_/np.linalg.norm(gaussian_glm.coef_), "o-", label="lin-gauss GLM filt", c=PALETTE[0])
-ax1.plot(lag_times, exp_poisson_glm.coef_/np.linalg.norm(exp_poisson_glm.coef_), "o-", label="poisson GLM filt", c=PALETTE[1])
+# flip the filters with [::-1] to match the original notebook convention
+ax1.plot(lag_times, gaussian_glm.coef_[::-1]/np.linalg.norm(gaussian_glm.coef_), "o-", label="lin-gauss GLM filt", c=PALETTE[0])
+ax1.plot(lag_times, exp_poisson_glm.coef_[::-1]/np.linalg.norm(exp_poisson_glm.coef_), "o-", label="poisson GLM filt", c=PALETTE[1])
 ax1.legend(loc = "upper left")
 ax1.set_title("(normalized) linear-Gaussian and Poisson GLM filter estimates")
 ax1.set_xlabel("time before spike (s)")
