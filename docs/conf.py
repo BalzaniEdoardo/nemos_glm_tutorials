@@ -17,6 +17,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx_copybutton",
     "sphinx_togglebutton",      # collapsible admonitions (`:class: dropdown`)
+    "sphinx_design",            # tabbed content (`{tab-set}` / `{tab-item}`)
 ]
 
 # Treat .md files as MyST notebooks (executed via myst-nb).

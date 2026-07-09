@@ -8,6 +8,17 @@ A collection of tutorials showing how to analyse systems-neuroscience datasets w
 
 A faithful rebuild of Jonathan Pillow's spike-train GLM short course, reproduced as a series of tutorials on fitting GLMs to retinal ganglion cell spike trains with `pynapple` and `NeMoS`.
 
+## Getting started
+
+New here? Start with the [installation guide](installation.md) to set up a local
+environment, then dive into a tutorial collection above.
+
+```{toctree}
+:hidden:
+
+installation.md
+```
+
 ```{toctree}
 :hidden:
 :glob:
