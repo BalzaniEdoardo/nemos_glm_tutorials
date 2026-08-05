@@ -80,13 +80,9 @@ As a first step, let's take a look at the cross-correlograms (CCGs), and let's c
 # 30 bins matching the original tutorial
 window_size_sec = 30 * bin_size
 
-ccgs = nap.compute_crosscorrelogram(units, binsize=bin_size, windowsize=window_size_sec)
-acgs = nap.compute_autocorrelogram(units, binsize=bin_size, windowsize=window_size_sec)
+ccgs = nap.compute_crosscorrelogram((units, units), binsize=bin_size, windowsize=window_size_sec)
 
-# drop acgs at t=0 
-acgs.loc[0] = np.nan
-
-# plot the first 10 rows
+# print the first 10 rows
 ccgs.iloc[:10]
 ```
 
@@ -95,17 +91,12 @@ As you can see, the CCGs are stored in a pandas dataframe. Each column represent
 ```{code-cell} ipython3
 
 fig = plt.figure(figsize=[12,8])
-for i in acgs.columns:
-    plt.subplot(len(units), len(units), i*len(units) + i + 1)
-    plt.title(f'cells ({i},{i})')
-    plt.plot(acgs[i])
-    plt.xlabel('time shift (s)')
-    
 for i, j in ccgs.columns:
-    plt.subplot(len(units), len(units), i*len(units) + j + 1)
-    plt.title(f'cells ({i},{j})')
-    plt.plot(ccgs[i, j])
-    plt.xlabel('time shift (s)')
+    if j >= i:
+        plt.subplot(len(units), len(units), i*len(units) + j + 1)
+        plt.title(f'cells ({i},{j})')
+        plt.plot(ccgs[i, j])
+        plt.xlabel('time shift (s)')
 plt.tight_layout()
 plt.show()
 
